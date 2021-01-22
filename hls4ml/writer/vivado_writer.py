@@ -18,10 +18,7 @@ class VivadoWriter(Writer):
         if type_class == 'HLSType':
             return 'typedef {precision} {name};\n'.format(name=atype.name, precision=atype.precision)
         elif type_class == 'CompressedType':
-            cpp_fmt = ('typedef struct {name} {{ '
-               '{index} row_index;'
-               '{index} col_index;'
-               '{precision} weight; }} {name};\n')
+            cpp_fmt = ('typedef nnet::compressed_weight_t<{index}, {precision} > {name};\n')
             return cpp_fmt.format(name=atype.name, index=atype.index_precision, precision=atype.precision)
         elif type_class == 'PackedType':
             n_elem_expr = '/' if atype.unpack else '*'

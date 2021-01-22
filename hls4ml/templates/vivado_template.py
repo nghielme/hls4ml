@@ -14,6 +14,7 @@ dense_config_template = """struct config{index} : nnet::dense_config {{
     static const unsigned reuse_factor = {reuse};
     static const unsigned n_zeros = {nzeros};
     static const unsigned n_nonzeros = {nonzeros};
+    static const unsigned compressed_block_factor = DIV_ROUNDUP(n_nonzeros, reuse_factor);
     static const bool store_weights_in_bram = false;
     typedef {accum_t} accum_t;
     typedef {bias_t} bias_t;
@@ -328,7 +329,7 @@ garnet_stack_config_template = (garnet_stack_base_config_template, garnet_stack_
 
 
 
-dense_function_template = 'nnet::dense<{input_t}, {output_t}, {config}>({input}, {output}, {w}, {b});'
+dense_function_template = 'nnet::dense{variant}<{input_t}, {output_t}, {config}>({input}, {output}, {w}, {b});'
 batchnorm_function_template = 'nnet::normalize<{input_t}, {output_t}, {config}>({input}, {output}, {scale}, {bias});'
 conv1d_function_template = 'nnet::conv_1d_{data_format}<{input_t}, {output_t}, {config}>({input}, {output}, {w}, {b});'
 conv2d_function_template = 'nnet::conv_2d_{data_format}<{input_t}, {output_t}, {config}>({input}, {output}, {w}, {b});'

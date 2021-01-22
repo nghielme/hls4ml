@@ -620,6 +620,11 @@ class Dense(Layer):
         params['w'] = self.get_weights('weight').name
         params['b'] = self.get_weights('bias').name
 
+        if self.get_attr('strategy') == 'compressed':
+            params['variant'] = "_compressed"
+        else:
+            params['variant'] = ""
+
         return [self._function_template.format(**params)]
 
     def config_cpp(self):

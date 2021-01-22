@@ -27,16 +27,6 @@
 
 namespace nnet {
 
-template<typename CONFIG_T>
-void fill_mult(typename CONFIG_T::index_t index,
-        typename CONFIG_T::accum_t mult[CONFIG_T::n_out],
-        typename CONFIG_T::accum_t weight) {
-    for(unsigned  k = 0; k < CONFIG_T::n_out; k++) {
-        #pragma HLS UNROLL
-        if (k == index) mult[k] += weight;
-    }
-}
-
 template<class data_T, class res_T, typename CONFIG_T>
 void dense_compressed(
         data_T    data[CONFIG_T::n_in],
@@ -62,36 +52,54 @@ void dense_compressed(
         acc[i] = (typename CONFIG_T::accum_t) (biases[i]);
     }
 
+    int out_index[CONFIG_T::reuse_factor][CONFIG_T::compressed_block_factor];
+    data_T inputs[CONFIG_T::reuse_factor][CONFIG_T::compressed_block_factor];
+
+    for(int ir = 0; ir < CONFIG_T::reuse_factor; ir++) {
+        #pragma HLS UNROLL
+        for(int im = 0; im < CONFIG_T::compressed_block_factor ; im++) {
+           #pragma HLS UNROLL
+           unsigned w = ir + CONFIG_T::reuse_factor * im;
+           inputs[ir][im] = data[weights[w].row_index];
+           out_index[ir][im] = weights[w].col_index;
+        }
+    }
+
     // Do the compressed matrix-multiply
-    const int rufactor = CONFIG_T::reuse_factor;
     ReuseLoop:
-    for(unsigned ir = 0; ir < rufactor; ir++) {
+    for(unsigned ir = 0; ir < CONFIG_T::reuse_factor; ir++) {
         #pragma HLS PIPELINE  II=1 rewind
 
-        typename CONFIG_T::accum_t mult[CONFIG_T::n_out];
+        typename CONFIG_T::accum_t mult[CONFIG_T::compressed_block_factor];
         #pragma HLS ARRAY_PARTITION variable=mult complete
 
-        ResetMult:
-        for(int imult = 0; imult < CONFIG_T::n_out; imult++) {
-            #pragma HLS UNROLL
-            mult[imult] = 0;
-        }
-
         CompressedMultLoop:
-        for(unsigned im = 0; im < multiplier_limit; im++) {
+        for(unsigned im = 0; im < CONFIG_T::compressed_block_factor; im++) {
             #pragma HLS UNROLL
-            unsigned w = im * rufactor + ir;
-            auto row = weights[w].row_index;
-            auto col = weights[w].col_index;
-            auto weight_cache = weights[w].weight;
-            data_T  data_cache = data[row];
-            //mult[col] += weight_cache * data_cache;
-            typename CONFIG_T::accum_t prod = CONFIG_T::template product<data_T, typename CONFIG_T::weight_t, typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
-            fill_mult<CONFIG_T>(col, mult, prod);
+            unsigned w = ir + CONFIG_T::reuse_factor * im;
+	    mult[im] = CONFIG_T::template product<data_T, decltype(weights[w].weight), typename CONFIG_T::accum_t>::product(inputs[0][im], weights[w].weight);
+            for (int is = 0; is < CONFIG_T::reuse_factor-1; is++) {
+                #pragma HLS UNROLL
+                inputs[is][im] = inputs[is+1][im];
+            }
         }
-
-        for (int im = 0; im < CONFIG_T::n_out; im++){
-            acc[im] += mult[im];
+        typename CONFIG_T::accum_t tmp_acc[CONFIG_T::n_out];
+        ResetMult:
+        for (int tacc = 0; tacc < CONFIG_T::n_out; tacc++) {
+            #pragma HLS UNROLL
+            tmp_acc[tacc] = 0;
+        }
+        AccumLoop1:
+        for(int im = 0; im < CONFIG_T::compressed_block_factor; im++) {
+            #pragma HLS UNROLL
+            int col = out_index[ir][im];
+            tmp_acc[col] += mult[im];
+        }
+        AccumLoop2:
+        #pragma unroll
+        for (int im = 0; im < CONFIG_T::n_out; im++) {
+            #pragma HLS UNROLL
+            acc[im] += tmp_acc[im];
         }
     }
 

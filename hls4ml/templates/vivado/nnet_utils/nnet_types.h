@@ -35,6 +35,12 @@ struct array {
     }  
 };
 
-}
+template<typename index_T, typename weight_T>
+struct compressed_weight_t {
+  index_T row_index;
+  index_T col_index;
+  weight_T weight;
+};
 
+}
 #endif
