@@ -34,13 +34,13 @@ void dense_compressed(
         typename CONFIG_T::weight_t  weights[CONFIG_T::n_nonzeros],
         typename CONFIG_T::bias_t    biases[CONFIG_T::n_out])
 {
-
+    //#pragma HLS function_instantiate variable=weights,biases
     const int multiplier_limit = DIV_ROUNDUP(CONFIG_T::n_nonzeros, CONFIG_T::reuse_factor);
 
     typename CONFIG_T::accum_t acc [CONFIG_T::n_out];
     #pragma HLS ARRAY_PARTITION variable=acc    complete
     #pragma HLS ARRAY_PARTITION variable=biases complete
-    #pragma HLS ARRAY_RESHAPE   variable=weights block factor=multiplier_limit
+    #pragma HLS ARRAY_RESHAPE   variable=weights cyclic factor=CONFIG_T::compressed_block_factor
     //if (CONFIG_T::store_weights_in_bram){
     //#pragma HLS RESOURCE variable=weights core=ROM_1P_BRAM
     #pragma HLS data_pack variable=weights struct_level
@@ -52,23 +52,18 @@ void dense_compressed(
         acc[i] = (typename CONFIG_T::accum_t) (biases[i]);
     }
 
-    int out_index[CONFIG_T::reuse_factor][CONFIG_T::compressed_block_factor];
-    data_T inputs[CONFIG_T::reuse_factor][CONFIG_T::compressed_block_factor];
-
-    for(int ir = 0; ir < CONFIG_T::reuse_factor; ir++) {
-        #pragma HLS UNROLL
-        for(int im = 0; im < CONFIG_T::compressed_block_factor ; im++) {
-           #pragma HLS UNROLL
-           unsigned w = ir + CONFIG_T::reuse_factor * im;
-           inputs[ir][im] = data[weights[w].row_index];
-           out_index[ir][im] = weights[w].col_index;
-        }
-    }
-
     // Do the compressed matrix-multiply
     ReuseLoop:
     for(unsigned ir = 0; ir < CONFIG_T::reuse_factor; ir++) {
         #pragma HLS PIPELINE  II=1 rewind
+
+        typename CONFIG_T::accum_t tmp_acc[CONFIG_T::n_out];
+        #pragma HLS ARRAY_PARTITION variable=tmp_acc complete
+        ResetMult:
+        for (int tacc = 0; tacc < CONFIG_T::n_out; tacc++) {
+            #pragma HLS UNROLL
+            tmp_acc[tacc] = 0;
+        }
 
         typename CONFIG_T::accum_t mult[CONFIG_T::compressed_block_factor];
         #pragma HLS ARRAY_PARTITION variable=mult complete
@@ -77,26 +72,14 @@ void dense_compressed(
         for(unsigned im = 0; im < CONFIG_T::compressed_block_factor; im++) {
             #pragma HLS UNROLL
             unsigned w = ir + CONFIG_T::reuse_factor * im;
-	    mult[im] = CONFIG_T::template product<data_T, decltype(weights[w].weight), typename CONFIG_T::accum_t>::product(inputs[0][im], weights[w].weight);
-            for (int is = 0; is < CONFIG_T::reuse_factor-1; is++) {
-                #pragma HLS UNROLL
-                inputs[is][im] = inputs[is+1][im];
-            }
+	    mult[im] = CONFIG_T::template product<data_T,
+						  decltype(weights[w].weight),
+						  typename CONFIG_T::accum_t>::product(data[weights[w].row_index], weights[w].weight);
+
+            tmp_acc[weights[w].col_index] += mult[im];
         }
-        typename CONFIG_T::accum_t tmp_acc[CONFIG_T::n_out];
-        ResetMult:
-        for (int tacc = 0; tacc < CONFIG_T::n_out; tacc++) {
-            #pragma HLS UNROLL
-            tmp_acc[tacc] = 0;
-        }
-        AccumLoop1:
-        for(int im = 0; im < CONFIG_T::compressed_block_factor; im++) {
-            #pragma HLS UNROLL
-            int col = out_index[ir][im];
-            tmp_acc[col] += mult[im];
-        }
+
         AccumLoop2:
-        #pragma unroll
         for (int im = 0; im < CONFIG_T::n_out; im++) {
             #pragma HLS UNROLL
             acc[im] += tmp_acc[im];
