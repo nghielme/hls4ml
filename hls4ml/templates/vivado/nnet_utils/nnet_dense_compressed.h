@@ -35,7 +35,6 @@ void dense_compressed(
         typename CONFIG_T::bias_t    biases[CONFIG_T::n_out])
 {
     //#pragma HLS function_instantiate variable=weights,biases
-    const int multiplier_limit = DIV_ROUNDUP(CONFIG_T::n_nonzeros, CONFIG_T::reuse_factor);
 
     typename CONFIG_T::accum_t acc [CONFIG_T::n_out];
     #pragma HLS ARRAY_PARTITION variable=acc    complete
@@ -57,6 +56,24 @@ void dense_compressed(
     for(unsigned ir = 0; ir < CONFIG_T::reuse_factor; ir++) {
         #pragma HLS PIPELINE  II=1 rewind
 
+        typename CONFIG_T::accum_t mult[CONFIG_T::compressed_block_factor];
+        #pragma HLS ARRAY_PARTITION variable=mult complete
+
+	decltype(CONFIG_T::weight_t::col_index) col[CONFIG_T::compressed_block_factor];
+        #pragma HLS ARRAY_PARTITION variable=col complete
+
+        CompressedMultLoop:
+        for(unsigned im = 0; im < CONFIG_T::compressed_block_factor; im++) {
+            #pragma HLS UNROLL
+            unsigned w = ir + CONFIG_T::reuse_factor * im;
+	    mult[im] =
+	      CONFIG_T::template product<data_T,
+					 decltype(weights[w].weight),
+					 typename CONFIG_T::accum_t>::product(data[weights[w].row_index], weights[w].weight);
+
+	    col[im] = weights[w].col_index;
+        }
+
         typename CONFIG_T::accum_t tmp_acc[CONFIG_T::n_out];
         #pragma HLS ARRAY_PARTITION variable=tmp_acc complete
         ResetMult:
@@ -65,18 +82,10 @@ void dense_compressed(
             tmp_acc[tacc] = 0;
         }
 
-        typename CONFIG_T::accum_t mult[CONFIG_T::compressed_block_factor];
-        #pragma HLS ARRAY_PARTITION variable=mult complete
-
-        CompressedMultLoop:
-        for(unsigned im = 0; im < CONFIG_T::compressed_block_factor; im++) {
-            #pragma HLS UNROLL
-            unsigned w = ir + CONFIG_T::reuse_factor * im;
-	    mult[im] = CONFIG_T::template product<data_T,
-						  decltype(weights[w].weight),
-						  typename CONFIG_T::accum_t>::product(data[weights[w].row_index], weights[w].weight);
-
-            tmp_acc[weights[w].col_index] += mult[im];
+        AccumLoop1:
+        for(int im = 0; im < CONFIG_T::compressed_block_factor; im++) {
+	    #pragma HLS_UNROLL
+            tmp_acc[col[im]] += mult[im];
         }
 
         AccumLoop2:
