@@ -39,7 +39,7 @@ void dense_compressed(
     typename CONFIG_T::accum_t acc [CONFIG_T::n_out];
     #pragma HLS ARRAY_PARTITION variable=acc    complete
     #pragma HLS ARRAY_PARTITION variable=biases complete
-    #pragma HLS ARRAY_RESHAPE   variable=weights cyclic factor=CONFIG_T::compressed_block_factor
+    #pragma HLS ARRAY_RESHAPE   variable=weights block factor=CONFIG_T::compressed_block_factor
     //if (CONFIG_T::store_weights_in_bram){
     //#pragma HLS RESOURCE variable=weights core=ROM_1P_BRAM
     #pragma HLS data_pack variable=weights struct_level
@@ -56,23 +56,8 @@ void dense_compressed(
     for(unsigned ir = 0; ir < CONFIG_T::reuse_factor; ir++) {
         #pragma HLS PIPELINE  II=1 rewind
 
-        typename CONFIG_T::accum_t mult[CONFIG_T::compressed_block_factor];
-        #pragma HLS ARRAY_PARTITION variable=mult complete
-
 	decltype(CONFIG_T::weight_t::col_index) col[CONFIG_T::compressed_block_factor];
         #pragma HLS ARRAY_PARTITION variable=col complete
-
-        CompressedMultLoop:
-        for(unsigned im = 0; im < CONFIG_T::compressed_block_factor; im++) {
-            #pragma HLS UNROLL
-            unsigned w = ir + CONFIG_T::reuse_factor * im;
-	    mult[im] =
-	      CONFIG_T::template product<data_T,
-					 decltype(weights[w].weight),
-					 typename CONFIG_T::accum_t>::product(data[weights[w].row_index], weights[w].weight);
-
-	    col[im] = weights[w].col_index;
-        }
 
         typename CONFIG_T::accum_t tmp_acc[CONFIG_T::n_out];
         #pragma HLS ARRAY_PARTITION variable=tmp_acc complete
@@ -82,10 +67,19 @@ void dense_compressed(
             tmp_acc[tacc] = 0;
         }
 
-        AccumLoop1:
-        for(int im = 0; im < CONFIG_T::compressed_block_factor; im++) {
-	    #pragma HLS_UNROLL
-            tmp_acc[col[im]] += mult[im];
+        CompressedMultLoop:
+        for(unsigned im = 0; im < CONFIG_T::compressed_block_factor; im++) {
+            #pragma HLS UNROLL
+            unsigned w = ir + CONFIG_T::reuse_factor * im;
+	    auto input = data[weights[w].row_index];
+	    auto weight_val = weights[w].weight;
+	    auto col = weights[w].col_index;
+	    auto mult =
+	      CONFIG_T::template product<data_T,
+					 decltype(weights[w].weight),
+					 typename CONFIG_T::accum_t>::product(input, weight_val);
+
+            tmp_acc[col] += mult;
         }
 
         AccumLoop2:

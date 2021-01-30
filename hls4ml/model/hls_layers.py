@@ -10,7 +10,7 @@ class Quantizer(object):
     def __init__(self, bits, hls_type):
         self.bits = bits
         self.hls_type = hls_type
-    
+
     def __call__(self, data):
         raise NotImplementedError
 
@@ -20,7 +20,7 @@ class IntegerPrecisionType(object):
         self.integer = width
         self.fractional = 0
         self.signed = signed
-    
+
     def __str__(self):
         typestring = 'ap_{signed}int<{width}>'.format(signed='u' if not self.signed else '', width=self.width)
         return typestring
@@ -42,7 +42,7 @@ class FixedPrecisionType(object):
         self.rounding_mode = rounding_mode
         self.saturation_mode = saturation_mode
         self.saturation_bits = saturation_bits
-    
+
     def __str__(self):
         args = [self.width, self.integer, self.rounding_mode, self.saturation_mode, self.saturation_bits]
         args = ','.join([str(arg) for arg in args if arg is not None])
@@ -108,12 +108,12 @@ class CompressedType(HLSType):
         super(CompressedType, self).__init__('compressed_type{index}', precision, **kwargs)
         self.index_precision = index_precision
 
-    def definition_cpp(self):
-        cpp_fmt = ('typedef struct {name} {{ '
-               '{index} row_index; '
-               '{index} col_index; '
-               '{precision} weight; }} {name};\n')
-        return cpp_fmt.format(name=self.name, index=self.index_precision, precision=self.precision)
+    # def definition_cpp(self):
+    #     cpp_fmt = ('typedef struct {name} {{ '
+    #            '{index} row_index; '
+    #            '{index} col_index; '
+    #            '{precision} weight; }} {name};\n')
+    #     return cpp_fmt.format(name=self.name, index=self.index_precision, precision=self.precision)
 
 class ExponentType(HLSType):
     def __init__(self, name, precision, **kwargs):
@@ -258,7 +258,7 @@ class WeightVariable(Variable):
                     # to right of decimal point
                     decimal_spaces = len(str(lsb).split('.')[1])
                 else:
-                    decimal_spaces = len(str(2**integer_bits)) 
+                    decimal_spaces = len(str(2**integer_bits))
                 self.precision_fmt = '%.{}f'.format(decimal_spaces)
             else:
                 self.precision_fmt = '%f'
@@ -445,7 +445,7 @@ class Layer(object):
 
     def make_stream_variable(self, shape, dim_names, var_name='layer{index}_out', type_name='layer{index}_t', precision=None, depth=0):
         pack_factor = self.model.config.get_layer_config_value(self, 'PackFactor', default=1)
-        
+
         return StreamVariable(shape, dim_names, var_name=var_name, type_name=type_name, precision=precision, n_pack=pack_factor, depth=depth, index=self.index)
 
     def add_weights(self, quantizer=None, compression=False):
@@ -596,10 +596,7 @@ class Dense(Layer):
         if self.model.config.is_resource_strategy(self):
             if self.model.config.backend.name == 'Vivado':
                 self.model.config.backend.set_closest_reuse_factor(self)
-            if compression:
-                self.set_attr('strategy', 'compressed')
-            else:
-                self.set_attr('strategy', 'resource')
+            self.set_attr('strategy', 'resource')
         else:
             self.set_attr('strategy', 'latency')
         self.add_output_variable(shape, dims)
@@ -611,7 +608,7 @@ class Dense(Layer):
             else:
                 if self.model.config.backend.name == 'Vivado':
                     self.weights['weight'].data = np.transpose(self.weights['weight'].data)
-                    
+
         self.set_attr('index_t', index_t)
         self.add_bias(quantizer=self.get_attr('bias_quantizer'))
 
@@ -620,7 +617,7 @@ class Dense(Layer):
         params['w'] = self.get_weights('weight').name
         params['b'] = self.get_weights('bias').name
 
-        if self.get_attr('strategy') == 'compressed':
+        if self.model.config.get_compression(self):
             params['variant'] = "_compressed"
         else:
             params['variant'] = ""
@@ -713,13 +710,13 @@ class SeparableConv1D(Layer):
             shape = [self.attributes['n_filt'], self.attributes['out_width']]
             dims = ['N_FILT_{}'.format(self.index), 'N_OUTPUTS_{}'.format(self.index)]
         self.add_output_variable(shape, dims)
-        
+
         depthwise_data = self.model.get_weights_data(self.name, 'depthwise_kernel')
         pointwise_data = self.model.get_weights_data(self.name, 'pointwise_kernel')
 
         self.add_weights_variable(name='depthwise', var_name='d{index}', data=depthwise_data, quantizer=self.get_attr('depthwise_quantizer'))
         self.add_weights_variable(name='pointwise', var_name='p{index}', data=pointwise_data, quantizer=self.get_attr('pointwise_quantizer'))
-        
+
         zero_bias_data = np.zeros((self.attributes['n_chan'],))
         self.add_weights_variable(name='zero_bias', var_name='z{index}', data=zero_bias_data)
 
@@ -803,7 +800,7 @@ class SeparableConv1D(Layer):
         else:
             params['in_width'] = '*'.join([str(k) for k in input_dims[1:]])
             params['n_chan'] = input_dims[0]
-        
+
         params['filt_width'] = 1
         params['dilation'] = self.get_attr('dilation', 1)
         params['n_filt'] = 'N_FILT_{}'.format(self.index)
@@ -910,13 +907,13 @@ class SeparableConv2D(Layer):
             shape = [self.attributes['n_filt'], self.attributes['out_height'], self.attributes['out_width']]
             dims = ['N_FILT_{}'.format(self.index), 'OUT_HEIGHT_{}'.format(self.index), 'OUT_WIDTH_{}'.format(self.index)]
         self.add_output_variable(shape, dims)
-        
+
         depthwise_data = self.model.get_weights_data(self.name, 'depthwise_kernel')
         pointwise_data = self.model.get_weights_data(self.name, 'pointwise_kernel')
 
         self.add_weights_variable(name='depthwise', var_name='d{index}', data=depthwise_data, quantizer=self.get_attr('depthwise_quantizer'))
         self.add_weights_variable(name='pointwise', var_name='p{index}', data=pointwise_data, quantizer=self.get_attr('pointwise_quantizer'))
-        
+
         zero_bias_data = np.zeros((self.attributes['n_chan'],))
         self.add_weights_variable(name='zero_bias', var_name='z{index}', data=zero_bias_data)
 
@@ -1479,7 +1476,7 @@ class GarNet(Layer):
         input_array = self.get_input_variable(self.inputs[0])
         partition_factor = input_array.shape[1] * (input_array.shape[0] // reuse_factor)
         input_array.pragma = ('partition', 'cyclic', partition_factor)
-        
+
         if self.attributes['collapse']:
             shape = [self._output_features]
             dims = ['OUT_FEATURES_{}'.format(self.index)]
@@ -1564,7 +1561,7 @@ class GarNet(Layer):
 
         # automatically make the variable unsigned if data are all positive
         signed = (np.amin(data) < 0.)
-        
+
         int_width = find_minimum_width(data, signed=signed)
 
         if quantize:
@@ -1572,9 +1569,9 @@ class GarNet(Layer):
         else:
             width = int_width + frac_width
             precision = FixedPrecisionType(width=width, integer=int_width, signed=signed, rounding_mode='AP_RND', saturation_mode='AP_SAT')
-            
+
         self.add_weights_variable(name=name, var_name=var_name, data=data, precision=precision)
-        
+
     def function_cpp(self):
         params = self._default_function_params()
 
@@ -1673,13 +1670,13 @@ class GarNetStack(GarNet):
             name = 'input_transform_{}_biases'.format(il)
             self._add_variable(name, 'input_transform_{}_b{{index}}'.format(il), bias, frac_width=10, quantize=quantize)
             sublayer_weights['input_transform_biases'] = self.weights[name]
-        
+
             weights_source = [
                 ('aggregator_distance', 'S{}'.format(il), 'kernel'),
                 ('aggregator_distance', 'S{}'.format(il), 'bias'),
                 ('output_transform', 'Fout{}'.format(il), 'bias')
             ]
-    
+
             for op_name, lname, wtype in weights_source:
                 data = self.model.get_weights_data(self.name, '{name}/{lname}_{wtype}:0'.format(name=self.name, lname=lname, wtype=wtype))
                 if wtype == 'kernel':

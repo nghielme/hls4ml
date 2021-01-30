@@ -146,7 +146,7 @@ class HLSConfig(object):
 
     def _parse_hls_config(self):
         hls_config = self.config['HLSConfig']
-        
+
         self.optimizers = hls_config.get('Optimizers')
         if 'SkipOptimizers' in hls_config:
             if self.optimizers is not None:
@@ -157,9 +157,9 @@ class HLSConfig(object):
                 try:
                     selected_optimizers.remove(opt)
                 except ValueError:
-                    pass                
+                    pass
             self.optimizers = selected_optimizers
-        
+
         model_cfg = hls_config.get('Model')
         if model_cfg is not None:
             precision_cfg = model_cfg.get('Precision')
@@ -379,7 +379,7 @@ class HLSModel(object):
             from random import choice
             length = 8
             return ''.join(choice(hexdigits) for m in range(length))
-        
+
         self.config.config['Stamp'] = make_stamp()
 
         self.config.writer.write_hls(self)
@@ -567,4 +567,3 @@ class HLSModel(object):
         os.chdir(curr_dir)
 
         return parse_vivado_report(self.config.get_output_dir())
-
