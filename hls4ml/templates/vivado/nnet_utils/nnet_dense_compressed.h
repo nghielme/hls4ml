@@ -24,6 +24,7 @@
 #include "nnet_dense.h"
 #include "hls_stream.h"
 #include <math.h>
+#include <assert.h>
 
 namespace nnet {
 
@@ -37,11 +38,25 @@ void fill_mult(typename CONFIG_T::index_t index,
     }
 }
 
+template<class data_T, typename CONFIG_T>
+void remove_zeros(data_T data[CONFIG_T::n_in])
+{
+  for (unsigned zeros_array_i = 0; zeros_array_i < CONFIG_T::n_zero_rows; zeros_array_i++) {
+    #pragma HLS UNROLL
+    for (unsigned i = CONFIG_T::zero_rows[zeros_array_i] + 1; i < CONFIG_T::n_in; i++) {
+      #pragma HLS UNROLL
+      data[i-1] = data[i];
+    }
+  }
+}
+
+  // currently only implementing
+
 template<class data_T, class res_T, typename CONFIG_T>
 void dense_compressed(
         data_T    data[CONFIG_T::n_in],
         res_T     res[CONFIG_T::n_out],
-        typename CONFIG_T::weight_t  weights[CONFIG_T::n_nonzeros],
+        typename CONFIG_T::weight_t  weights[CONFIG_T::n_weights],
         typename CONFIG_T::bias_t    biases[CONFIG_T::n_out])
 {
     //#pragma HLS function_instantiate variable=weights,biases
@@ -55,6 +70,8 @@ void dense_compressed(
     #pragma HLS data_pack variable=weights struct_level
     //}
 
+    remove_zeros<data_T, CONFIG_T>(data);
+    
     InitAccum:
     for(unsigned i = 0; i < CONFIG_T::n_out; i++) {
         #pragma HLS UNROLL

@@ -14,14 +14,47 @@ dense_config_template = """struct config{index} : nnet::dense_config {{
     static const unsigned reuse_factor = {reuse};
     static const unsigned n_zeros = {nzeros};
     static const unsigned n_nonzeros = {nonzeros};
-    static const unsigned compressed_block_factor = DIV_ROUNDUP(n_nonzeros, reuse_factor);
     static const bool store_weights_in_bram = false;
+
     typedef {accum_t} accum_t;
     typedef {bias_t} bias_t;
     typedef {weight_t} weight_t;
     typedef {index_t} index_t;
     template<class x_T, class y_T, class res_T>
     using product = nnet::product::{product_type}<x_T, y_T, res_T>;
+
+}};\n"""
+
+dense_compressed_config_template = """struct config{index} : nnet::dense_config {{
+    static const unsigned n_in = {n_in};
+    static const unsigned n_out = {n_out};
+    static const unsigned io_type = nnet::{iotype};
+    static const unsigned strategy = nnet::{strategy};
+    static const unsigned reuse_factor = {reuse};
+    static const bool store_weights_in_bram = false;
+
+    static const unsigned max_columns = {max_columns};  // maximum columns in a row
+    static const unsigned n_zero_rows = {n_zero_rows};  // input not used at all
+    static const unsigned n_extra_rows = {n_extra_rows};  // rows added for load balancing
+    static const unsigned n_merge_rows = {n_merge_rows};   // rows merged for load balancing
+    static const unsigned n_merge_start = {n_merge_start};  // how to divide the merged rows
+
+    static const unsigned n_rows = n_in + n_extra_rows - n_zero_rows;
+    static const unsigned n_weights = n_rows * max_columns;
+
+    // mod is just because C++ doesn't allow zero lenght arrays
+    static constexpr unsigned zero_rows[{n_zero_rows_mod}] = {zero_rows};
+    static constexpr unsigned extra_rows[{n_extra_rows_mod}] = {extra_rows};
+    static constexpr unsigned merge_rows[{n_merge_rows_mod}] = {merge_rows};
+    static constexpr unsigned merge_start[{n_merge_start_mod}] = {merge_start};
+
+    typedef {accum_t} accum_t;
+    typedef {bias_t} bias_t;
+    typedef {weight_t} weight_t;
+    typedef {index_t} index_t;
+    template<class x_T, class y_T, class res_T>
+    using product = nnet::product::{product_type}<x_T, y_T, res_T>;
+
 }};\n"""
 
 batchnorm_config_template = """struct config{index} : nnet::batchnorm_config {{
@@ -367,7 +400,7 @@ garnet_include_list = ['nnet_utils/nnet_garnet.h']
 class VivadoBackend(Backend):
     def __init__(self):
         super(VivadoBackend, self).__init__('Vivado')
-        self.register_templates('Dense', dense_function_template, dense_config_template, dense_include_list)
+        self.register_templates('Dense', dense_function_template, [dense_config_template, dense_compressed_config_template], dense_include_list)
         self.register_templates('BinaryDense'            , dense_function_template,       dense_config_template, dense_include_list)
         self.register_templates('BatchNormalization'     , batchnorm_function_template,   batchnorm_config_template, batchnorm_include_list)
         self.register_templates('Conv1D'                 , conv1d_function_template,      [conv1d_config_template, conv_mult_config_template], conv1d_include_list)

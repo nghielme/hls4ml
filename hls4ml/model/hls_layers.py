@@ -108,13 +108,6 @@ class CompressedType(HLSType):
         super(CompressedType, self).__init__('compressed_type{index}', precision, **kwargs)
         self.index_precision = index_precision
 
-    # def definition_cpp(self):
-    #     cpp_fmt = ('typedef struct {name} {{ '
-    #            '{index} row_index; '
-    #            '{index} col_index; '
-    #            '{precision} weight; }} {name};\n')
-    #     return cpp_fmt.format(name=self.name, index=self.index_precision, precision=self.precision)
-
 class ExponentType(HLSType):
     def __init__(self, name, precision, **kwargs):
         super(ExponentType, self).__init__('exponent_type{index}', precision, **kwargs)
@@ -267,32 +260,33 @@ class WeightVariable(Variable):
         return '{type} {name}[{size}]'.format(type=self.type.name, name=self.cppname, size=self.data_length)
 
 class CompressedWeightVariable(WeightVariable):
+    """
+    Implement weights as a 2-D array (made 1D C-order) of (col_index, weight) structs,
+    with the first dimension being the row_index. For work balance, rows may be split, with
+    extra rows added at the end. The row indices of these extra rows are are in the
+    extra_rows attribute.
+    """
+
     def __init__(self, var_name, type_name, precision, data, reuse_factor, quantizer=None, **kwargs):
         super(CompressedWeightVariable, self).__init__(var_name, type_name, precision, data, quantizer=quantizer, **kwargs)
-        self.extra_zeros = 0
-        self.data_length = np.prod(data.shape) - self.nzeros
-        while self.data_length % reuse_factor != 0:
-            self.extra_zeros += 1
-            self.data_length += 1
-        self.nonzeros = np.prod(data.shape) - self.nzeros + self.extra_zeros
 
-        # Compress the array
-        weights = []
-        extra_nzero_cnt = self.extra_zeros
+        # Compress the array using a list of lists.
+        # First make a list of empy
+        weights = [[]] * data.shape[0]
+        # extra_nzero_cnt = self.extra_zeros
         it = np.nditer(data, order='C', flags=['multi_index'])
         max_idx = 0
         while not it.finished:
             val = it[0]
-            if not (val == 0 and extra_nzero_cnt < 1):
-                if val == 0:
-                    extra_nzero_cnt -= 1
-                if it.multi_index[0] > max_idx:
-                    max_idx = it.multi_index[0]
+            if val != 0:
                 if it.multi_index[1] > max_idx:
                     max_idx = it.multi_index[1]
-                weights.append([it.multi_index[1], it.multi_index[0], val])
+                weights[it.multi_index[0]].append((it.multi_index[1], val))
             it.iternext()
-        weights.sort()
+
+        # now balance the weights
+        (self.max_columns, self.zero_rows, self.extra_rows, self.merge_rows, self.merge_start
+             ) = self._balance_weights(weights)
 
         index_precision = 32
         if max_idx > 0:
@@ -301,14 +295,112 @@ class CompressedWeightVariable(WeightVariable):
 
         self.data = weights
 
+        # for the iterator
+        self._initialize_iterator()
+
+    def _initialize_iterator(self):
+        """ Sets the value to before valid first
+        """
+        self._current_row = -1
+        self._current_column = self.max_columns - 1
+
+    @staticmethod
+    def _balance_weights(weights):
+        """
+        Balance the weights, returning a tuple with
+          (max_columns:  max values per row,
+           zero_rows: row indices that are not used at all,
+           extra_rows:  row indices that are appended for load balancing
+           merge_rows:  row indices of short rows, for merging
+           merge_start:  a simple way to merge indices without passing max_columns)
+        Weights is modified in place.
+        """
+
+        MIN_SPLIT = 1.5
+        MAX_MERGE = 0.6
+        MIN_DIFF = 2  # don't change things if difference is less than this
+
+        sizes = [len(x) for x in weights]
+        mean = np.mean([len(x) for x in weights if len(x) > 0])
+
+        # let's make split_val the largest unsplit size
+        try:
+            split_val = max([len(x) for x in weights if len(x) < mean + MIN_DIFF and len(x)/mean < MIN_SPLIT])
+        except ValueError:
+            split_val = 0
+
+        # set a minimim split val in strange cases
+        split_val = max(int(np.ceil(mean)), split_val)
+
+        extra_rows = []  # from splitting
+        merge_rows = []  # indices to merge
+        zero_rows = []  # indices to skip
+
+        for row_index, sz in enumerate(sizes):
+            if sz == 0:
+                zero_rows.append(row_index)
+                continue
+            diff = sz - mean
+            if abs(diff) > MIN_DIFF:
+                rel_sz = sz / mean
+                if sz > split_val and rel_sz > MIN_SPLIT:
+                    # split row row_index
+                    extra_rows.append(row_index)
+                    weights.append(weights[row_index][split_val:])
+                    weights[row_index] = weights[row_index][:split_val]
+                    # check to see if the added needs to be split
+                    while (len(weights[-1]) > split_val
+                           and len(weights[-1]) / mean > MIN_SPLIT):
+                        extra_rows.append(row_index)
+                        weights.append(weights[-1][split_val:])
+                        weights[-2] = weights[-2][:split_val]
+                    # check to see if the last index should be merged
+                    if len(weights[-1]) < mean - MIN_DIFF and len(weights[-1])/mean < MAX_MERGE:
+                        merge_rows.append(len(weights[-1]) - 1)
+                elif rel_sz < MAX_MERGE:
+                    merge_rows.append(row_index)
+
+        # let's try to merge the small items
+        max_columns = max([len(x) for x in weights])
+        # Do simple addition in row provided max_size is not surpassed
+        merge_rows.sort()
+
+        merge_start = []  # when to start new processing
+        curr_length = 0
+        for i, w_idx in enumerate(merge_rows):
+            curr_length += len(weights[w_idx])
+            if curr_length > max_columns:
+                # don't actually merge, but start new
+                merge_start.append(i)
+                curr_length = 0
+
+        return (max_columns, zero_rows, extra_rows, merge_rows, merge_start)
+
     def __iter__(self):
-        self._iterator = iter(self.data)
+        self._initialize_iterator()
         return self
 
     def __next__(self):
-        value = next(self._iterator)
-        value_fmt = self.precision_fmt % value[2]
-        return '{ %u, %u, %s }' % (value[1], value[0], value_fmt)
+        """ Note: this skips empty rows
+        """
+        self._current_column += 1
+        if self._current_column == self.max_columns:
+            # go to new row; use do while loop
+            while True:
+                self._current_row += 1
+                if self._current_row >= len(self.data):
+                    raise StopIteration
+                if self._current_row not in self.zero_rows:
+                    # found a valid row
+                    break
+            self._current_column = 0
+        # now have valid _current_row and __current_column
+        try:
+            value = self.data[self._current_row][self._current_column]
+        except IndexError:
+            value = (0, 0)
+        value_fmt = self.precision_fmt % value[1]
+        return '{ %u, %s }' % (value[0], value_fmt)
 
     next = __next__
 
@@ -628,12 +720,31 @@ class Dense(Layer):
         params = self._default_config_params()
         params['n_in'] = self.get_input_variable().size_cpp()
         params['n_out'] = self.get_output_variable().size_cpp()
-        params['nzeros'] = self.get_weights('weight').nzeros
-        params['nonzeros'] = self.get_weights('weight').nonzeros
-        params['product_type'] = self.model.config.backend.product_type(self.get_input_variable().type.precision, self.get_weights('weight').type.precision)
+        weights = self.get_weights('weight')
+        if isinstance(weights, CompressedWeightVariable):
+            config_template_idx = 1
+            params['max_columns'] = weights.max_columns
+
+            for name in ('zero_rows', 'extra_rows', 'merge_rows', 'merge_start'):
+                item = getattr(weights, name)
+                params[f'n_{name}'] = len(item)
+                # since C++ doesn't allow zero-lenght arrays, have to check case
+                if weights.zero_rows:
+                    params[f'n_{name}_mod'] = len(item)
+                    params[name] = '{' + ', '.join(str(x) for x in item) + '}'
+                else:
+                    params[f'n_{name}_mod'] = 1
+                    params[name] = '{0}'  # dummy
+        else:
+            config_template_idx = 0
+            params['nzeros'] = weights.nzeros
+            params['nonzeros'] = weights.nonzeros
+
+        params['product_type'] = self.model.config.backend.product_type(
+            self.get_input_variable().type.precision, self.get_weights('weight').type.precision)
         params['strategy'] = self.get_attr('strategy')
 
-        return self._config_template.format(**params)
+        return self._config_template[config_template_idx].format(**params)
 
 class Conv1D(Layer):
     def initialize(self):

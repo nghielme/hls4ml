@@ -97,7 +97,7 @@ void load_compressed_weights_from_txt(T *w, const char* fname) {
             std::replace(token.begin(), token.end(), ',', ' ');
             std::istringstream structss(token);
 
-            if(!(structss >> w[i].row_index >> w[i].col_index >> w[i].weight)) {
+            if(!(structss >> w[i].col_index >> w[i].weight)) {
                 std::cerr << "ERROR: Unable to parse file " << std::string(fname);
                 exit(1);
             }
