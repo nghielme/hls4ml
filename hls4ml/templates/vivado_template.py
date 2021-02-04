@@ -1,7 +1,5 @@
-import numpy as np
 import math
 from bisect import bisect_left
-from queue import Queue
 from collections.abc import Iterable
 
 from hls4ml.templates.templates import Backend
@@ -34,7 +32,7 @@ dense_compressed_config_template = """struct config{index} : nnet::dense_config 
     static const bool store_weights_in_bram = false;
 
     static const unsigned max_columns = {max_columns};  // maximum columns in a row
-    static const unsigned n_zero_rows = {n_zero_rows};  // input not used at all
+    static const unsigned n_zero_rows = {n_zero_rows};  // input row not used at all
     static const unsigned n_extra_rows = {n_extra_rows};  // rows added for load balancing
     static const unsigned n_merge_rows = {n_merge_rows};   // rows merged for load balancing
     static const unsigned n_merge_start = {n_merge_start};  // how to divide the merged rows
@@ -43,7 +41,7 @@ dense_compressed_config_template = """struct config{index} : nnet::dense_config 
     static const unsigned n_weights = n_rows * max_columns;
 
     // mod is just because C++ doesn't allow zero lenght arrays
-    static constexpr unsigned zero_rows[{n_zero_rows_mod}] = {zero_rows};
+    static constexpr unsigned zero_remapping[{n_in}] = {zero_remapping};
     static constexpr unsigned extra_rows[{n_extra_rows_mod}] = {extra_rows};
     static constexpr unsigned merge_rows[{n_merge_rows_mod}] = {merge_rows};
     static constexpr unsigned merge_start[{n_merge_start_mod}] = {merge_start};

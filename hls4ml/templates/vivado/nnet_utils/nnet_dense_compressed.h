@@ -24,7 +24,6 @@
 #include "nnet_dense.h"
 #include "hls_stream.h"
 #include <math.h>
-#include <assert.h>
 
 namespace nnet {
 
@@ -38,19 +37,7 @@ void fill_mult(typename CONFIG_T::index_t index,
     }
 }
 
-template<class data_T, typename CONFIG_T>
-void remove_zeros(data_T data[CONFIG_T::n_in])
-{
-  for (unsigned zeros_array_i = 0; zeros_array_i < CONFIG_T::n_zero_rows; zeros_array_i++) {
-    #pragma HLS UNROLL
-    for (unsigned i = CONFIG_T::zero_rows[zeros_array_i] + 1; i < CONFIG_T::n_in; i++) {
-      #pragma HLS UNROLL
-      data[i-1] = data[i];
-    }
-  }
-}
-
-  // currently only implementing
+// This version only works when reuse_factor < n_in, and it doesn't merge rows for now
 
 template<class data_T, class res_T, typename CONFIG_T>
 void dense_compressed(
@@ -59,19 +46,21 @@ void dense_compressed(
         typename CONFIG_T::weight_t  weights[CONFIG_T::n_weights],
         typename CONFIG_T::bias_t    biases[CONFIG_T::n_out])
 {
-    //#pragma HLS function_instantiate variable=weights,biases
+    // currently only implementing reuse-factor < n_in
+    static_assert(CONFIG_T::reuse_factor < CONFIG_T::n_in, "Currently only implementing reuse-factor < n_in");
+
+    constexpr unsigned multiplier_limit = DIV_ROUNDUP(CONFIG_T::n_rows, CONFIG_T::reuse_factor);
+    constexpr unsigned reduced_in = CONFIG_T::n_in - CONFIG_T::n_zero_rows;
 
     typename CONFIG_T::accum_t acc [CONFIG_T::n_out];
     #pragma HLS ARRAY_PARTITION variable=acc    complete
     #pragma HLS ARRAY_PARTITION variable=biases complete
-    #pragma HLS ARRAY_PARTITION variable=weights block factor=CONFIG_T::reuse_factor
+    #pragma HLS ARRAY_PARTITION variable=weights block factor=CONFIG_T::n_rows
     //if (CONFIG_T::store_weights_in_bram){
     //#pragma HLS RESOURCE variable=weights core=ROM_1P_BRAM
     #pragma HLS data_pack variable=weights struct_level
     //}
 
-    remove_zeros<data_T, CONFIG_T>(data);
-    
     InitAccum:
     for(unsigned i = 0; i < CONFIG_T::n_out; i++) {
         #pragma HLS UNROLL
@@ -87,25 +76,36 @@ void dense_compressed(
         #pragma HLS ARRAY_PARTITION variable=mult complete
 
 	ResetMult:
-        for(int imult = 0; imult < CONFIG_T::n_out; imult++) {
+        for(unsigned imult = 0; imult < CONFIG_T::n_out; imult++) {
             #pragma HLS UNROLL
             mult[imult] = 0;
         }
 
         CompressedMultLoop:
-        for(unsigned im = 0; im < CONFIG_T::compressed_block_factor; im++) {
+        for(unsigned im = 0; im < multiplier_limit; im++) {
             #pragma HLS UNROLL
-            unsigned w = ir + CONFIG_T::reuse_factor * im;
-            auto row = weights[w].row_index;
-            auto col = weights[w].col_index;
-            auto weight_cache = weights[w].weight;
-            auto data_cache = data[row];
-	    auto prod =
-	      CONFIG_T::template product<data_T,
-					 decltype(weights[w].weight),
-					 typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
-
-	    fill_mult<CONFIG_T>(col, mult, prod);
+            unsigned w = ir * CONFIG_T::reuse_factor + im;
+	    if (w < reduced_in) {
+		auto row = CONFIG_T::zero_remapping[w];
+		auto col = weights[w].col_index;
+		auto weight_cache = weights[w].weight;
+		auto data_cache = data[row];
+		auto prod =
+		    CONFIG_T::template product<data_T,
+					       decltype(weights[w].weight),
+					       typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
+		fill_mult<CONFIG_T>(col, mult, prod);
+	    } else if (w < CONFIG_T::n_rows) {
+		auto row = CONFIG_T::extra_rows[w - CONFIG_T::n_rows];
+		auto col = weights[w].col_index;
+		auto weight_cache = weights[w].weight;
+		auto data_cache = data[row];
+		auto prod =
+		    CONFIG_T::template product<data_T,
+					       decltype(weights[w].weight),
+					       typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
+		fill_mult<CONFIG_T>(col, mult, prod);
+	    }		
         }
 
         AccumLoop2:

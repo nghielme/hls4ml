@@ -1,7 +1,5 @@
 from __future__ import print_function
 import six
-import os
-import sys
 import re
 import numpy as np
 from collections import OrderedDict
@@ -285,8 +283,8 @@ class CompressedWeightVariable(WeightVariable):
             it.iternext()
 
         # now balance the weights
-        (self.max_columns, self.zero_rows, self.extra_rows, self.merge_rows, self.merge_start
-             ) = self._balance_weights(weights)
+        (self.max_columns, self.zero_rows, self.zero_remapping,
+         self.extra_rows, self.merge_rows, self.merge_start) = self._balance_weights(weights)
 
         index_precision = 32
         if max_idx > 0:
@@ -310,11 +308,16 @@ class CompressedWeightVariable(WeightVariable):
         Balance the weights, returning a tuple with
           (max_columns:  max values per row,
            zero_rows: row indices that are not used at all,
+           zero_remapping: The same info as zero_rows, but useful for remapping input data
            extra_rows:  row indices that are appended for load balancing
            merge_rows:  row indices of short rows, for merging
            merge_start:  a simple way to merge indices without passing max_columns)
         Weights is modified in place.
+
+        Note: row number for extra_rows, merge_rows, are after removing zero rows
         """
+
+        orig_size = len(weights)
 
         MIN_SPLIT = 1.5
         MAX_MERGE = 0.6
@@ -365,7 +368,13 @@ class CompressedWeightVariable(WeightVariable):
         # Do simple addition in row provided max_size is not surpassed
         merge_rows.sort()
 
-        merge_start = []  # when to start new processing
+        # When processing, we remove zero rows, so change the indices
+        sub = CompressedWeightVariable._subval(zero_rows, max_columns)
+        extra_rows = [x - sub[x] for x in extra_rows]
+        merge_rows = [x - sub[x] for x in merge_rows]
+
+        # when to start new processing
+        merge_start = []
         curr_length = 0
         for i, w_idx in enumerate(merge_rows):
             curr_length += len(weights[w_idx])
@@ -374,7 +383,24 @@ class CompressedWeightVariable(WeightVariable):
                 merge_start.append(i)
                 curr_length = 0
 
-        return (max_columns, zero_rows, extra_rows, merge_rows, merge_start)
+        return (max_columns, zero_rows, sub[:orig_size], extra_rows, merge_rows, merge_start)
+
+    @staticmethod
+    def _subval(zeros, max_columns):
+        """ return a map of how much to subtract due to zero rows
+        """
+        subtract = []
+        subval = 0
+        idx = 0
+        for zero in zeros:
+            while idx < zero:
+                subtract.append(subval)
+                idx += 1
+            subval += 1
+        while idx < max_columns:
+            subtract.append(subval)
+            idx += 1
+        return subtract
 
     def __iter__(self):
         self._initialize_iterator()
@@ -735,6 +761,13 @@ class Dense(Layer):
                 else:
                     params[f'n_{name}_mod'] = 1
                     params[name] = '{0}'  # dummy
+            # zero_mapping can be long so potentially add \n
+            zero_remapping_split = [weights.zero_remapping[i:i + 20]
+                                  for i in range(0, len(weights.zero_remapping), 20)]
+            params['zero_remapping'] = ('{'
+                                      + ',\n'.join(', '.join(str(x) for x in y)
+                                                   for y in zero_remapping_split)
+                                      + '}')
         else:
             config_template_idx = 0
             params['nzeros'] = weights.nzeros
