@@ -291,7 +291,11 @@ class CompressedWeightVariable(WeightVariable):
             index_precision = int(np.log2(max_idx) + 1)
         self.type = CompressedType(type_name, precision, IntegerPrecisionType(width=index_precision, signed=False), **kwargs)
 
+        # update the data
         self.data = weights
+
+        # one needs to update the data_length
+        self.data_length = (len(weights) - len(self.zero_rows)) * self.max_columns
 
         # for the iterator
         self._initialize_iterator()

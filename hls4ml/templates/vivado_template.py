@@ -41,10 +41,10 @@ dense_compressed_config_template = """struct config{index} : nnet::dense_config 
     static const unsigned n_weights = n_rows * max_columns;
 
     // mod is just because C++ doesn't allow zero lenght arrays
-    static constexpr unsigned zero_remapping[{n_in}] = {zero_remapping};
-    static constexpr unsigned extra_rows[{n_extra_rows_mod}] = {extra_rows};
-    static constexpr unsigned merge_rows[{n_merge_rows_mod}] = {merge_rows};
-    static constexpr unsigned merge_start[{n_merge_start_mod}] = {merge_start};
+    static unsigned zero_remapping[{n_in}];
+    static unsigned extra_rows[{n_extra_rows_mod}];
+    static unsigned merge_rows[{n_merge_rows_mod}];
+    static unsigned merge_start[{n_merge_start_mod}];
 
     typedef {accum_t} accum_t;
     typedef {bias_t} bias_t;
@@ -53,7 +53,14 @@ dense_compressed_config_template = """struct config{index} : nnet::dense_config 
     template<class x_T, class y_T, class res_T>
     using product = nnet::product::{product_type}<x_T, y_T, res_T>;
 
-}};\n"""
+}};
+
+unsigned config{index}::zero_remapping[{n_in}] = {zero_remapping};
+unsigned config{index}::extra_rows[{n_extra_rows_mod}] = {extra_rows};
+unsigned config{index}::merge_rows[{n_merge_rows_mod}] = {merge_rows};
+unsigned config{index}::merge_start[{n_merge_start_mod}] = {merge_start};
+
+\n"""
 
 batchnorm_config_template = """struct config{index} : nnet::batchnorm_config {{
     static const unsigned n_in = {n_in};
