@@ -270,7 +270,7 @@ class CompressedWeightVariable(WeightVariable):
 
         # Compress the array using a list of lists.
         # First make a list of empy
-        weights = [[]] * data.shape[0]
+        weights = [[] for _ in range(data.shape[0])]
         # extra_nzero_cnt = self.extra_zeros
         it = np.nditer(data, order='C', flags=['multi_index'])
         max_idx = 0
@@ -373,7 +373,7 @@ class CompressedWeightVariable(WeightVariable):
         merge_rows.sort()
 
         # When processing, we remove zero rows, so change the indices
-        sub = CompressedWeightVariable._subval(zero_rows, max_columns)
+        sub = CompressedWeightVariable._subval(zero_rows, len(weights))
         extra_rows = [x - sub[x] for x in extra_rows]
         merge_rows = [x - sub[x] for x in merge_rows]
 
