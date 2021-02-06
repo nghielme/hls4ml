@@ -759,7 +759,7 @@ class Dense(Layer):
                 item = getattr(weights, name)
                 params[f'n_{name}'] = len(item)
                 # since C++ doesn't allow zero-lenght arrays, have to check case
-                if weights.zero_rows:
+                if item:
                     params[f'n_{name}_mod'] = len(item)
                     params[name] = '{' + ', '.join(str(x) for x in item) + '}'
                 else:
