@@ -3,6 +3,7 @@ import six
 import re
 import numpy as np
 from collections import OrderedDict
+from copy import copy
 
 class Quantizer(object):
     def __init__(self, bits, hls_type):
@@ -268,6 +269,8 @@ class CompressedWeightVariable(WeightVariable):
     def __init__(self, var_name, type_name, precision, data, reuse_factor, quantizer=None, **kwargs):
         super(CompressedWeightVariable, self).__init__(var_name, type_name, precision, data, quantizer=quantizer, **kwargs)
 
+        self._debug_mode = False
+
         # Compress the array using a list of lists.
         # First make a list of empy
         weights = [[] for _ in range(data.shape[0])]
@@ -299,6 +302,9 @@ class CompressedWeightVariable(WeightVariable):
 
         # for the iterator
         self._initialize_iterator()
+
+        # optional validaton
+        self._validate_weights(data)
 
     def _initialize_iterator(self):
         """ Sets the value to before valid first
@@ -373,9 +379,7 @@ class CompressedWeightVariable(WeightVariable):
         merge_rows.sort()
 
         # When processing, we remove zero rows, so change the indices
-        sub = CompressedWeightVariable._subval(zero_rows, len(weights))
-        extra_rows = [x - sub[x] for x in extra_rows]
-        merge_rows = [x - sub[x] for x in merge_rows]
+        zero_remap = CompressedWeightVariable._remap(zero_rows, orig_size - len(zero_rows))
 
         # when to start new processing
         merge_start = []
@@ -387,24 +391,24 @@ class CompressedWeightVariable(WeightVariable):
                 merge_start.append(i)
                 curr_length = 0
 
-        return (max_columns, zero_rows, sub[:orig_size], extra_rows, merge_rows, merge_start)
+        return (max_columns, zero_rows, zero_remap, extra_rows, merge_rows, merge_start)
 
     @staticmethod
-    def _subval(zeros, max_columns):
-        """ return a map of how much to subtract due to zero rows
+    def _remap(zeros, max_columns):
+        """ return a map of how much to add to weights row index to get data index
         """
-        subtract = []
-        subval = 0
+        add = []
+        addval = 0
         idx = 0
         for zero in zeros:
-            while idx < zero:
-                subtract.append(subval)
+            while idx + addval < zero:
+                add.append(addval)
                 idx += 1
-            subval += 1
+            addval += 1
         while idx < max_columns:
-            subtract.append(subval)
+            add.append(addval)
             idx += 1
-        return subtract
+        return add
 
     def __iter__(self):
         self._initialize_iterator()
@@ -430,16 +434,60 @@ class CompressedWeightVariable(WeightVariable):
         except IndexError:
             value = (0, 0)
         value_fmt = self.precision_fmt % value[1]
-        return '{ %u, %s }' % (value[0], value_fmt)
+        if self._debug_mode:
+            return value
+        else:
+            return '{ %u, %s }' % (value[0], value_fmt)
 
     next = __next__
 
+    def _validate_weights(self, data):
+        """ check that the weights are reconstucted
+        """
+
+        reco_weights = np.zeros(data.shape, dtype=np.float32)
+
+        self._debug_mode = True
+
+        for i, val in enumerate(self):
+            row_raw = i // self.max_columns
+            try:
+                row = row_raw + self.zero_remapping[row_raw]
+            except IndexError:
+                # in the extra columns range
+                extra_index = row_raw - len(self.zero_remapping)
+                row = self.extra_rows[extra_index]
+            column = val[0]
+            if val[1]:
+                reco_weights[row, column] = val[1]
+
+        self._debug_mode = False
+
+        # Check for equality:
+        for i in range(data.shape[0]):
+            for j in range(data.shape[1]):
+                if data[i, j] != reco_weights[i, j]:
+                    # with np.printoptions(threshold=np.inf):
+                    #     print(f"{self.max_columns=}")
+                    #     print(f"{self.zero_rows=}")
+                    #     print(f"{self.extra_rows=}")
+                    #     print(f"{self.merge_rows=}")
+                    #     print(f"{self.zero_remapping=}")
+                    #     print(f"{len(self.zero_remapping)=}")
+                    #     print(f"{data.shape=}")
+                    #     print(f"{data=}")
+                    #     print(f"{self.data=}")
+                    #     print(f"{reco_weights=}")
+
+                    raise RuntimeError(
+                        f"data[{i}, {j}] = {data[i,j]}, reco_weights[{i}, {j}] = {reco_weights[i,j]}")
+
 class ExponentWeightVariable(WeightVariable):
     def __init__(self, var_name, type_name, precision, data, quantizer, **kwargs):
-        super(ExponentWeightVariable, self).__init__(var_name, type_name, precision, data, quantizer, **kwargs)
         '''
         WeightVariable for Exponent aka po2 data. The data should already by quantized by the quantizer.
         '''
+        super(ExponentWeightVariable, self).__init__(var_name, type_name, precision, data, quantizer, **kwargs)
         self.type = ExponentType(type_name, precision, **kwargs)
         self.shape = list(self.data.shape[:-1])
 

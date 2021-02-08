@@ -41,7 +41,7 @@ dense_compressed_config_template = """struct config{index} : nnet::dense_config 
     static const unsigned n_weights = n_rows * max_columns;
 
     // mod is just because C++ doesn't allow zero lenght arrays
-    static unsigned zero_remapping[{n_in}];
+    static unsigned zero_remapping[{n_in} - {n_zero_rows}];
     static unsigned extra_rows[{n_extra_rows_mod}];
     static unsigned merge_rows[{n_merge_rows_mod}];
     static unsigned merge_start[{n_merge_start_mod}];
@@ -55,7 +55,7 @@ dense_compressed_config_template = """struct config{index} : nnet::dense_config 
 
 }};
 
-unsigned config{index}::zero_remapping[{n_in}] = {zero_remapping};
+unsigned config{index}::zero_remapping[{n_in} - {n_zero_rows}] = {zero_remapping};
 unsigned config{index}::extra_rows[{n_extra_rows_mod}] = {extra_rows};
 unsigned config{index}::merge_rows[{n_merge_rows_mod}] = {merge_rows};
 unsigned config{index}::merge_start[{n_merge_start_mod}] = {merge_start};

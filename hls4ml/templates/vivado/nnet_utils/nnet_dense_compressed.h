@@ -21,6 +21,7 @@
 #define NNET_COMPRESSED_LAYER_H_
 
 #include "nnet_common.h"
+#include "nnet_types.h"
 #include "nnet_dense.h"
 #include "hls_stream.h"
 #include <math.h>
@@ -90,21 +91,25 @@ void dense_compressed(
 		auto col = weights[w].col_index;
 		auto weight_cache = weights[w].weight;
 		auto data_cache = data[row];
-		auto prod =
-		    CONFIG_T::template product<data_T,
-					       decltype(weights[w].weight),
-					       typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
-		fill_mult<CONFIG_T>(col, mult, prod);
+		if (weight_cache != static_cast<decltype(weight_cache)>(0))  {
+		    auto prod =
+			CONFIG_T::template product<data_T,
+						   decltype(weights[w].weight),
+						   typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
+		    fill_mult<CONFIG_T>(col, mult, prod);
+		}
 	    } else if (w < CONFIG_T::n_rows) {
 		auto row = CONFIG_T::extra_rows[w - CONFIG_T::n_rows];
 		auto col = weights[w].col_index;
 		auto weight_cache = weights[w].weight;
 		auto data_cache = data[row];
-		auto prod =
-		    CONFIG_T::template product<data_T,
-					       decltype(weights[w].weight),
-					       typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
-		fill_mult<CONFIG_T>(col, mult, prod);
+		if (weight_cache != static_cast<decltype(weight_cache)>(0))  {
+		    auto prod =
+			CONFIG_T::template product<data_T,
+						   decltype(weights[w].weight),
+						   typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
+		    fill_mult<CONFIG_T>(col, mult, prod);
+		}
 	    }		
         }
 
