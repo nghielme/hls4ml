@@ -25,6 +25,7 @@
 #include "nnet_dense.h"
 #include "hls_stream.h"
 #include <math.h>
+//#include <iostream>
 
 namespace nnet {
 
@@ -50,8 +51,8 @@ void dense_compressed(
     // currently only implementing reuse-factor < n_in
     static_assert(CONFIG_T::reuse_factor < CONFIG_T::n_in, "Currently only implementing reuse-factor < n_in");
 
-    constexpr unsigned multiplier_limit = DIV_ROUNDUP(CONFIG_T::n_rows, CONFIG_T::reuse_factor);
     constexpr unsigned reduced_in = CONFIG_T::n_in - CONFIG_T::n_zero_rows;
+    constexpr unsigned multiplier_limit = DIV_ROUNDUP(CONFIG_T::n_weights, CONFIG_T::reuse_factor);
 
     typename CONFIG_T::accum_t acc [CONFIG_T::n_out];
     #pragma HLS ARRAY_PARTITION variable=acc    complete
@@ -61,6 +62,9 @@ void dense_compressed(
     //#pragma HLS RESOURCE variable=weights core=ROM_1P_BRAM
     #pragma HLS data_pack variable=weights struct_level
     //}
+
+    // std::cout << "n_in = " << CONFIG_T::n_in << ", n_out = " << CONFIG_T::n_out
+    // 	      << ", reduced_in = " << reduced_in << ", mult_limit = " << multiplier_limit << std::endl;
 
     InitAccum:
     for(unsigned i = 0; i < CONFIG_T::n_out; i++) {
@@ -85,12 +89,15 @@ void dense_compressed(
         CompressedMultLoop:
         for(unsigned im = 0; im < multiplier_limit; im++) {
             #pragma HLS UNROLL
-            unsigned w = ir * CONFIG_T::reuse_factor + im;
-	    if (w < reduced_in) {
-		auto row = CONFIG_T::zero_remapping[w];
+            unsigned w = ir * multiplier_limit + im;
+	    auto row_raw = w / CONFIG_T::max_columns;
+	    // std::cout << "ir = " <<  ir << ", im = " << im << ", w = " << w;
+	    if (row_raw < reduced_in) {
+		auto row = row_raw + CONFIG_T::zero_remapping[row_raw];
 		auto col = weights[w].col_index;
 		auto weight_cache = weights[w].weight;
 		auto data_cache = data[row];
+		//std::cout << "(" << row << ", " << col << ") = " << weight_cache << std::endl;
 		if (weight_cache != static_cast<decltype(weight_cache)>(0))  {
 		    auto prod =
 			CONFIG_T::template product<data_T,
@@ -98,11 +105,12 @@ void dense_compressed(
 						   typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
 		    fill_mult<CONFIG_T>(col, mult, prod);
 		}
-	    } else if (w < CONFIG_T::n_rows) {
-		auto row = CONFIG_T::extra_rows[w - CONFIG_T::n_rows];
+	    } else if (row_raw < CONFIG_T::n_rows) {
+		auto row = CONFIG_T::extra_rows[row_raw - reduced_in];
 		auto col = weights[w].col_index;
 		auto weight_cache = weights[w].weight;
 		auto data_cache = data[row];
+		//std::cout << "(" << row << ", " << col << ") = " << weight_cache << std::endl;
 		if (weight_cache != static_cast<decltype(weight_cache)>(0))  {
 		    auto prod =
 			CONFIG_T::template product<data_T,
@@ -110,7 +118,7 @@ void dense_compressed(
 						   typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
 		    fill_mult<CONFIG_T>(col, mult, prod);
 		}
-	    }		
+	    }
         }
 
         AccumLoop2:
