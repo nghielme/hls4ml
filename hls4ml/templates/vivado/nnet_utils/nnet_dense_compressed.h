@@ -51,13 +51,12 @@ void dense_compressed(
     // currently only implementing reuse-factor < n_in
     static_assert(CONFIG_T::reuse_factor < CONFIG_T::n_in, "Currently only implementing reuse-factor < n_in");
 
-    constexpr unsigned reduced_in = CONFIG_T::n_in - CONFIG_T::n_zero_rows;
     constexpr unsigned multiplier_limit = DIV_ROUNDUP(CONFIG_T::n_weights, CONFIG_T::reuse_factor);
 
     typename CONFIG_T::accum_t acc [CONFIG_T::n_out];
     #pragma HLS ARRAY_PARTITION variable=acc    complete
     #pragma HLS ARRAY_PARTITION variable=biases complete
-    #pragma HLS ARRAY_PARTITION variable=weights block factor=CONFIG_T::n_rows
+    #pragma HLS ARRAY_PARTITION variable=weights block factor=CONFIG_T::n_in
     //if (CONFIG_T::store_weights_in_bram){
     //#pragma HLS RESOURCE variable=weights core=ROM_1P_BRAM
     #pragma HLS data_pack variable=weights struct_level
@@ -90,34 +89,18 @@ void dense_compressed(
         for(unsigned im = 0; im < multiplier_limit; im++) {
             #pragma HLS UNROLL
             unsigned w = ir * multiplier_limit + im;
-	    auto row_raw = w / CONFIG_T::max_columns;
+	    auto row = w / CONFIG_T::max_columns;
 	    // std::cout << "ir = " <<  ir << ", im = " << im << ", w = " << w;
-	    if (row_raw < reduced_in) {
-		auto row = row_raw + CONFIG_T::zero_remapping[row_raw];
-		auto col = weights[w].col_index;
-		auto weight_cache = weights[w].weight;
-		auto data_cache = data[row];
-		//std::cout << "(" << row << ", " << col << ") = " << weight_cache << std::endl;
-		if (weight_cache != static_cast<decltype(weight_cache)>(0))  {
-		    auto prod =
-			CONFIG_T::template product<data_T,
-						   decltype(weights[w].weight),
-						   typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
-		    fill_mult<CONFIG_T>(col, mult, prod);
-		}
-	    } else if (row_raw < CONFIG_T::n_rows) {
-		auto row = CONFIG_T::extra_rows[row_raw - reduced_in];
-		auto col = weights[w].col_index;
-		auto weight_cache = weights[w].weight;
-		auto data_cache = data[row];
-		//std::cout << "(" << row << ", " << col << ") = " << weight_cache << std::endl;
-		if (weight_cache != static_cast<decltype(weight_cache)>(0))  {
-		    auto prod =
-			CONFIG_T::template product<data_T,
-						   decltype(weights[w].weight),
-						   typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
-		    fill_mult<CONFIG_T>(col, mult, prod);
-		}
+	    auto col = weights[w].col_index;
+	    auto weight_cache = weights[w].weight;
+	    auto data_cache = data[row];
+	    //std::cout << "(" << row << ", " << col << ") = " << weight_cache << std::endl;
+	    if (weight_cache != static_cast<decltype(weight_cache)>(0))  {
+		auto prod =
+		    CONFIG_T::template product<data_T,
+					       decltype(weights[w].weight),
+					       typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
+		fill_mult<CONFIG_T>(col, mult, prod);
 	    }
         }
 

@@ -285,9 +285,8 @@ class CompressedWeightVariable(WeightVariable):
                 weights[it.multi_index[0]].append((it.multi_index[1], val))
             it.iternext()
 
-        # now balance the weights
-        (self.max_columns, self.zero_rows, self.zero_remapping,
-         self.extra_rows, self.merge_rows, self.merge_start) = self._balance_weights(weights)
+        # in this simplified form don't try to balance the weights
+        self.max_columns = max([len(x) for x in weights])
 
         index_precision = 32
         if max_idx > 0:
@@ -298,7 +297,7 @@ class CompressedWeightVariable(WeightVariable):
         self.data = weights
 
         # one needs to update the data_length
-        self.data_length = (len(weights) - len(self.zero_rows)) * self.max_columns
+        self.data_length = len(weights) * self.max_columns
 
         # for the iterator
         self._initialize_iterator()
@@ -312,104 +311,6 @@ class CompressedWeightVariable(WeightVariable):
         self._current_row = -1
         self._current_column = self.max_columns - 1
 
-    @staticmethod
-    def _balance_weights(weights):
-        """
-        Balance the weights, returning a tuple with
-          (max_columns:  max values per row,
-           zero_rows: row indices that are not used at all,
-           zero_remapping: The same info as zero_rows, but useful for remapping input data
-           extra_rows:  row indices that are appended for load balancing
-           merge_rows:  row indices of short rows, for merging
-           merge_start:  a simple way to merge indices without passing max_columns)
-        Weights is modified in place.
-
-        Note: row number for extra_rows, merge_rows, are after removing zero rows
-        """
-
-        orig_size = len(weights)
-
-        MIN_SPLIT = 1.5
-        MAX_MERGE = 0.6
-        MIN_DIFF = 2  # don't change things if difference is less than this
-
-        sizes = [len(x) for x in weights]
-        mean = np.mean([len(x) for x in weights if len(x) > 0])
-
-        # let's make split_val the largest unsplit size
-        try:
-            split_val = max([len(x) for x in weights if len(x) < mean + MIN_DIFF and len(x)/mean < MIN_SPLIT])
-        except ValueError:
-            split_val = 0
-
-        # set a minimim split val in strange cases
-        split_val = max(int(np.ceil(mean)), split_val)
-
-        extra_rows = []  # from splitting
-        merge_rows = []  # indices to merge
-        zero_rows = []  # indices to skip
-
-        for row_index, sz in enumerate(sizes):
-            if sz == 0:
-                zero_rows.append(row_index)
-                continue
-            diff = sz - mean
-            if abs(diff) > MIN_DIFF:
-                rel_sz = sz / mean
-                if sz > split_val and rel_sz > MIN_SPLIT:
-                    # split row row_index
-                    extra_rows.append(row_index)
-                    weights.append(weights[row_index][split_val:])
-                    weights[row_index] = weights[row_index][:split_val]
-                    # check to see if the added needs to be split
-                    while (len(weights[-1]) > split_val
-                           and len(weights[-1]) / mean > MIN_SPLIT):
-                        extra_rows.append(row_index)
-                        weights.append(weights[-1][split_val:])
-                        weights[-2] = weights[-2][:split_val]
-                    # check to see if the last index should be merged
-                    if len(weights[-1]) < mean - MIN_DIFF and len(weights[-1])/mean < MAX_MERGE:
-                        merge_rows.append(len(weights[-1]) - 1)
-                elif rel_sz < MAX_MERGE:
-                    merge_rows.append(row_index)
-
-        # let's try to merge the small items
-        max_columns = max([len(x) for x in weights])
-        # Do simple addition in row provided max_size is not surpassed
-        merge_rows.sort()
-
-        # When processing, we remove zero rows, so change the indices
-        zero_remap = CompressedWeightVariable._remap(zero_rows, orig_size - len(zero_rows))
-
-        # when to start new processing
-        merge_start = []
-        curr_length = 0
-        for i, w_idx in enumerate(merge_rows):
-            curr_length += len(weights[w_idx])
-            if curr_length > max_columns:
-                # don't actually merge, but start new
-                merge_start.append(i)
-                curr_length = 0
-
-        return (max_columns, zero_rows, zero_remap, extra_rows, merge_rows, merge_start)
-
-    @staticmethod
-    def _remap(zeros, max_columns):
-        """ return a map of how much to add to weights row index to get data index
-        """
-        add = []
-        addval = 0
-        idx = 0
-        for zero in zeros:
-            while idx + addval < zero:
-                add.append(addval)
-                idx += 1
-            addval += 1
-        while idx < max_columns:
-            add.append(addval)
-            idx += 1
-        return add
-
     def __iter__(self):
         self._initialize_iterator()
         return self
@@ -419,14 +320,9 @@ class CompressedWeightVariable(WeightVariable):
         """
         self._current_column += 1
         if self._current_column == self.max_columns:
-            # go to new row; use do while loop
-            while True:
-                self._current_row += 1
-                if self._current_row >= len(self.data):
-                    raise StopIteration
-                if self._current_row not in self.zero_rows:
-                    # found a valid row
-                    break
+            self._current_row += 1
+            if self._current_row >= len(self.data):
+                raise StopIteration
             self._current_column = 0
         # now have valid _current_row and __current_column
         try:
@@ -450,13 +346,7 @@ class CompressedWeightVariable(WeightVariable):
         self._debug_mode = True
 
         for i, val in enumerate(self):
-            row_raw = i // self.max_columns
-            try:
-                row = row_raw + self.zero_remapping[row_raw]
-            except IndexError:
-                # in the extra columns range
-                extra_index = row_raw - len(self.zero_remapping)
-                row = self.extra_rows[extra_index]
+            row = i // self.max_columns
             column = val[0]
             if val[1]:
                 reco_weights[row, column] = val[1]
@@ -469,11 +359,6 @@ class CompressedWeightVariable(WeightVariable):
                 if data[i, j] != reco_weights[i, j]:
                     # with np.printoptions(threshold=np.inf):
                     #     print(f"{self.max_columns=}")
-                    #     print(f"{self.zero_rows=}")
-                    #     print(f"{self.extra_rows=}")
-                    #     print(f"{self.merge_rows=}")
-                    #     print(f"{self.zero_remapping=}")
-                    #     print(f"{len(self.zero_remapping)=}")
                     #     print(f"{data.shape=}")
                     #     print(f"{data=}")
                     #     print(f"{self.data=}")
@@ -802,24 +687,6 @@ class Dense(Layer):
         if isinstance(weights, CompressedWeightVariable):
             config_template_idx = 1
             params['max_columns'] = weights.max_columns
-
-            for name in ('zero_rows', 'extra_rows', 'merge_rows', 'merge_start'):
-                item = getattr(weights, name)
-                params[f'n_{name}'] = len(item)
-                # since C++ doesn't allow zero-lenght arrays, have to check case
-                if item:
-                    params[f'n_{name}_mod'] = len(item)
-                    params[name] = '{' + ', '.join(str(x) for x in item) + '}'
-                else:
-                    params[f'n_{name}_mod'] = 1
-                    params[name] = '{0}'  # dummy
-            # zero_mapping can be long so potentially add \n
-            zero_remapping_split = [weights.zero_remapping[i:i + 20]
-                                  for i in range(0, len(weights.zero_remapping), 20)]
-            params['zero_remapping'] = ('{'
-                                      + ',\n'.join(', '.join(str(x) for x in y)
-                                                   for y in zero_remapping_split)
-                                      + '}')
         else:
             config_template_idx = 0
             params['nzeros'] = weights.nzeros
