@@ -25,7 +25,6 @@
 #include "nnet_dense.h"
 #include "hls_stream.h"
 #include <math.h>
-//#include <iostream>
 
 namespace nnet {
 
@@ -51,68 +50,69 @@ void dense_compressed(
     // currently only implementing reuse-factor < n_in
     static_assert(CONFIG_T::reuse_factor < CONFIG_T::n_in, "Currently only implementing reuse-factor < n_in");
 
-    constexpr unsigned multiplier_limit = DIV_ROUNDUP(CONFIG_T::n_weights, CONFIG_T::reuse_factor);
+    #pragma HLS dataflow
+
+    constexpr unsigned block_size = CONFIG_T::n_in / CONFIG_T::reuse_factor;
 
     typename CONFIG_T::accum_t acc [CONFIG_T::n_out];
     #pragma HLS ARRAY_PARTITION variable=acc    complete
     #pragma HLS ARRAY_PARTITION variable=biases complete
-    #pragma HLS ARRAY_PARTITION variable=weights block factor=CONFIG_T::n_in
+    //#pragma HLS ARRAY_RESHAPE variable=weaghts block factor=CONFIG_T::n_in
     //if (CONFIG_T::store_weights_in_bram){
     //#pragma HLS RESOURCE variable=weights core=ROM_1P_BRAM
     #pragma HLS data_pack variable=weights struct_level
     //}
 
-    // std::cout << "n_in = " << CONFIG_T::n_in << ", n_out = " << CONFIG_T::n_out
-    // 	      << ", reduced_in = " << reduced_in << ", mult_limit = " << multiplier_limit << std::endl;
 
-    InitAccum:
+ InitAccum:
     for(unsigned i = 0; i < CONFIG_T::n_out; i++) {
         #pragma HLS UNROLL
         acc[i] = (typename CONFIG_T::accum_t) (biases[i]);
     }
 
-    // Do the compressed matrix-multiply
-    ReuseLoop:
-    for(unsigned ir = 0; ir < CONFIG_T::reuse_factor; ir++) {
-        #pragma HLS PIPELINE  II=1 rewind
+    typename CONFIG_T::accum_t prod[CONFIG_T::n_in][CONFIG_T::max_columns];
+    typename CONFIG_T::index_t index[CONFIG_T::n_in][CONFIG_T::max_columns];
+    typename CONFIG_T::accum_t mult[CONFIG_T::n_out];
+    #pragma HLS ARRAY_PARTITION variable=mult complete
 
-        typename CONFIG_T::accum_t mult[CONFIG_T::n_out];
-        #pragma HLS ARRAY_PARTITION variable=mult complete
-
-	ResetMult:
-        for(unsigned imult = 0; imult < CONFIG_T::n_out; imult++) {
-            #pragma HLS UNROLL
-            mult[imult] = 0;
-        }
-
-        CompressedMultLoop:
-        for(unsigned im = 0; im < multiplier_limit; im++) {
-            #pragma HLS UNROLL
-            unsigned w = ir * multiplier_limit + im;
-	    auto row = w / CONFIG_T::max_columns;
-	    // std::cout << "ir = " <<  ir << ", im = " << im << ", w = " << w;
-	    auto col = weights[w].col_index;
-	    auto weight_cache = weights[w].weight;
-	    auto data_cache = data[row];
-	    //std::cout << "(" << row << ", " << col << ") = " << weight_cache << std::endl;
-	    if (weight_cache != static_cast<decltype(weight_cache)>(0))  {
-		auto prod =
-		    CONFIG_T::template product<data_T,
-					       decltype(weights[w].weight),
-					       typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
-		fill_mult<CONFIG_T>(col, mult, prod);
-	    }
-        }
-
-        AccumLoop2:
-        for (int im = 0; im < CONFIG_T::n_out; im++) {
-            #pragma HLS UNROLL
-            acc[im] += mult[im];
-        }
+ ResetMult:
+    for(unsigned imult = 0; imult < CONFIG_T::n_out; imult++) {
+        #pragma HLS UNROLL
+	mult[imult] = 0;
     }
 
+ ReuseLoop:
+    for(unsigned row = 0; row < CONFIG_T::n_in; row++) {
+        #pragma HLS UNROLL factor=block_size
+	data_T  data_cache = data[row];
+	for (unsigned i = 0; i < CONFIG_T::max_columns; i++) {
+            #pragma HLS UNROLL
+	    auto weight = weights[row * CONFIG_T::max_columns + i];
+	    index[row][i] = weight.col_index;
+	    auto weight_cache = weight.weight;
+	    prod[row][i] = CONFIG_T::template product<data_T,
+						      decltype(weight_cache),
+						      typename CONFIG_T::accum_t>::product(data_cache, weight_cache);
+	}
+    }
+
+ MergeColumns:
+    for (unsigned row = 0; row < CONFIG_T::n_in; row++) {
+	for (unsigned i = 0; i < CONFIG_T::max_columns; i++) {
+	    # pragma UNROLL
+	    fill_mult<CONFIG_T>(index[row][i], mult, prod[row][i]);
+	}
+    }
+
+ Accumulate:
+    for (int im = 0; im < CONFIG_T::n_out; im++) {
+	# pragma UNROLL
+	acc[im] += mult[im];
+    }
+
+
     // Cast to "res_t" type
-    ResultLoop:
+ ResultLoop:
     for(unsigned i = 0; i < CONFIG_T::n_out; i++){
         #pragma HLS UNROLL
         //res[i] = (res_T) (acc[i]);
