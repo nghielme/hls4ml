@@ -74,7 +74,7 @@ void dense_compressed(
     // Do the compressed matrix-multiply
     ReuseLoop:
     for(unsigned ir = 0; ir < CONFIG_T::reuse_factor; ir++) {
-        #pragma HLS PIPELINE  II=1 rewind
+        #pragma HLS PIPELINE  II=CONFIG_T::reuse_factor rewind
 
         typename CONFIG_T::accum_t mult[CONFIG_T::n_out];
         #pragma HLS ARRAY_PARTITION variable=mult complete
