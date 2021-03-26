@@ -24,9 +24,10 @@ class QuartusWriter(Writer):
         return max_rf
 
     def print_array_to_cpp(self, var, layer, odir):
-        #######################################
-        ## Print weight array to C++
-        #######################################
+        """
+        Print weight array to C++
+        """
+
         h_file = open("{}/firmware/weights/{}.h".format(odir,var.name),"w")
 
         #meta data
@@ -95,11 +96,34 @@ class QuartusWriter(Writer):
                 clock_mhz = 1000/(model.config.get_config_value('ClockPeriod'))
                 newline += 'hls_scheduler_target_fmax_mhz({})\n'.format(np.ceil(clock_mhz).astype(np.int))
 
-            elif '//hls-fpga-machine-learning insert header' in line:
+            elif '//hls-fpga-machine-learning insert header g++' in line:
                 inputs_str = ', '.join(['inputdat ' + i.definition_cpp_name() for i in model_inputs])
 
                 newline = ''
-                newline += indent + inputs_str + '\n'
+                print(f'{model.config.get_config_value("ExternalWeights")=}')
+                if model.config.get_config_value("ExternalWeights"):
+                    newline += indent + inputs_str
+                    for layer in model.get_layers():
+                        for w in layer.get_weights():
+                            newline += ',\n' + indent + \
+                              f'{w.type.name} {w.name}[{w.size_cpp()}]'
+                    newline += '\n'
+                else:
+                    newline += indent + inputs_str + '\n'
+
+            elif '//hls-fpga-machine-learning insert header i++' in line:
+                inputs_str = ', '.join(['inputdat ' + i.definition_cpp_name() for i in model_inputs])
+
+                newline = ''
+                if model.config.get_config_value("ExternalWeights"):
+                    newline += indent + inputs_str
+                    for layer in model.get_layers():
+                        for w in layer.get_weights():
+                            newline += ',\n' + indent + \
+                              f'hls_avalon_slave_memory_argument({w.size_cpp()} * sizeof({w.type.name})) {w.type.name}* {w.name}'
+                    newline += '\n'
+                else:
+                    newline += indent + inputs_str + '\n'
 
             elif '//hls-fpga-machine-learning insert weights' in line:
                 newline = line
@@ -254,6 +278,9 @@ class QuartusWriter(Writer):
         fout.close()
 
     def write_weights(self, model):
+        if model.config.get_config_value("ExternalWeights"):
+            # not needed if the weights are provided externally
+            return
         for layer in model.get_layers():
             for weights in layer.get_weights():
                 self.print_array_to_cpp(weights, layer, model.config.get_output_dir())
