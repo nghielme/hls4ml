@@ -221,7 +221,6 @@ class QuartusWriter(Writer):
                 inputs_str = ', '.join(['input_data ' + i.name for i in model_inputs])
 
                 newline = ''
-                print(f'{model.config.get_config_value("ExternalWeights")=}')
                 if model.config.get_config_value("ExternalWeights"):
                     newline += indent + inputs_str
                     for layer in model.get_layers():
