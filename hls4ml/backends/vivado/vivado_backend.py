@@ -179,13 +179,14 @@ class VivadoBackend(FPGABackend):
     def get_default_flow(self):
         return self._default_flow
     
-    def create_initial_config(self, part='xcku115-flvb2104-2-i', clock_period=5, io_type='io_parallel'):
+    def create_initial_config(self, part='xcku115-flvb2104-2-i', clock_period=5, io_type='io_parallel', external_weights=False):
         config = {}
 
         config['Part'] = part if part is not None else 'xcku115-flvb2104-2-i'
         config['ClockPeriod'] = clock_period
         config['IOType'] = io_type
         config['HLSConfig'] = {}
+        # external weights not yet supported
 
         return config
 

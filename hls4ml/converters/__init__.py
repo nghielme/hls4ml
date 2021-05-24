@@ -186,6 +186,7 @@ def convert_from_keras_model(model, output_dir='my-hls-test', project_name='mypr
             Defaults to 5.
         io_type (str, optional): Type of implementation used. One of
             'io_parallel' or 'io_serial'. Defaults to 'io_parallel'.
+
         hls_config (dict, optional): The HLS config.
         kwargs** (dict, optional): Additional parameters that will be used to create the config of the specified backend
     Raises:

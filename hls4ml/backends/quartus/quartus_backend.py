@@ -62,13 +62,14 @@ class QuartusBackend(FPGABackend):
     def get_default_flow(self):
         return self._default_flow
     
-    def create_initial_config(self, part='Arria10', clock_period=5, io_type='io_parallel'):
+    def create_initial_config(self, part='Arria10', clock_period=5, io_type='io_parallel', external_weights=False):
         config = {}
 
         config['Part'] = part if part is not None else 'Arria10'
         config['ClockPeriod'] = clock_period
         config['IOType'] = io_type
         config['HLSConfig'] = {}
+        config["ExternalWeights"] = external_weights
 
         return config
 
