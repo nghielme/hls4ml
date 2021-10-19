@@ -115,8 +115,7 @@ class QuartusWriter(Writer):
                 newline += 'hls_scheduler_target_fmax_mhz({})\n'.format(np.ceil(clock_mhz).astype(np.int))
 
             elif '//hls-fpga-machine-learning insert header g++' in line:
-                inputs_str = ', '.join(['input_data ' + i.name for i in model_inputs])
-
+                inputs_str = 'input_data inputs'
                 newline = ''
                 if model.config.get_config_value("ExternalWeights"):
                     newline += indent + inputs_str
@@ -129,8 +128,7 @@ class QuartusWriter(Writer):
                     newline += indent + inputs_str + '\n'
 
             elif '//hls-fpga-machine-learning insert header i++' in line:
-                inputs_str = ', '.join(['inputdat ' + i.name for i in model_inputs])
-
+                inputs_str = 'input_data inputs'
                 newline = ''
                 if model.config.get_config_value("ExternalWeights"):
                     newline += indent + inputs_str
@@ -216,10 +214,9 @@ class QuartusWriter(Writer):
             elif '//hls-fpga-machine-learning insert outputs' in line:
                 for out in model_outputs:
                     newline = ''
-                    newline += indent + out.type.name + ' data' + '[' + out.size_cpp() + ']' + ';\n'
+                    newline += indent + out.definition_cpp() + ';\n'
             elif '//hls-fpga-machine-learning insert header g++' in line:
-                inputs_str = ', '.join(['input_data ' + i.name for i in model_inputs])
-
+                inputs_str = 'input_data inputs'
                 newline = ''
                 if model.config.get_config_value("ExternalWeights"):
                     newline += indent + inputs_str
@@ -231,8 +228,7 @@ class QuartusWriter(Writer):
                 else:
                     newline += indent + inputs_str + '\n'
             elif '//hls-fpga-machine-learning insert header i++' in line:
-                inputs_str = ', '.join(['inputdat ' + i.name for i in model_inputs])
-
+                inputs_str = 'input_data inputs'
                 newline = ''
                 if model.config.get_config_value("ExternalWeights"):
                     newline += indent + inputs_str
@@ -377,14 +373,14 @@ class QuartusWriter(Writer):
 
                 newline += indent + f'for(int i = 0; i < num_iterations; i++) {{\n'
 
-                input_vars = ','.join([f'{i.cppname}[i]' for i in model.get_input_variables()])
+                input_vars = 'inputs[i]'
 
                 if model.config.get_config_value("ExternalWeights"):
                     for layer in model.get_layers():
                         for w in layer.get_weights():
                             input_vars += ', ' + w.name
 
-                newline += indent + f'  ihc_hls_enqueue(&{outvar.cppname}[i], {model.config.get_project_name()}, {input_vars});\n'
+                newline += indent + f'  ihc_hls_enqueue(&outputs[i], {model.config.get_project_name()}, {input_vars});\n'
                 newline += indent + '}\n'
             elif 'hls-fpga-machine-learning insert run' in line:
                 newline = line
@@ -460,18 +456,16 @@ class QuartusWriter(Writer):
                     newline += indent + 'nnet::convert_data<{}, {}, {}>({}, inputs_ap.{});\n'.format(dtype, i.type.name, i.size_cpp(), i.cppname, i.cppname)
                 newline += '\n'
 
-                for o in model_outputs:
-                    newline += indent + 'outputdat {name}_ap;\n'.format(name=o.cppname)
+                newline += indent + 'output_data outputs_ap;\n'
 
-                input_vars = ','.join([i.cppname + '_ap' for i in model.get_input_variables()])
-
+                input_vars = 'inputs_ap'
                 if model.config.get_config_value("ExternalWeights"):
                     for layer in model.get_layers():
                         for w in layer.get_weights():
                             input_vars += ', ' + w.name
                
                 output_vars = ','.join([o.cppname + '_ap' for o in model.get_output_variables()])
-                top_level = indent + '{} = {}({});\n'.format(output_vars, model.config.get_project_name(), input_vars)
+                top_level = indent + 'outputs_ap = {}({});\n'.format(model.config.get_project_name(), input_vars)
                 newline += top_level
                 newline += '\n'
 
