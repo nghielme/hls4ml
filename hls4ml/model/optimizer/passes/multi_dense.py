@@ -1,16 +1,11 @@
 from hls4ml.model.optimizer import OptimizerPass
-from hls4ml.model.hls_model import Dense
+from hls4ml.model.layers import Dense
 import numpy as np
 
 class ReplaceMultidimensionalDenseWithConv(OptimizerPass):
     def match(self, node):
-        is_match = node.__class__.__name__ == 'Dense'
-        if is_match:
-            shape = node.get_input_variable().shape
-            if len(shape) > 1 and shape[0] == 1:
-                shape = shape[1:]
-            is_match = len(shape) > 1
-        return is_match
+        return isinstance(node, Dense) and \
+            len(node.get_input_variable().shape) > 1
 
     def transform(self, model, node):
         dim = len(node.get_input_variable().shape) - 1
