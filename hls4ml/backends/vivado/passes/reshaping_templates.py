@@ -1,5 +1,5 @@
 
-from hls4ml.model.layers import ZeroPadding1D, ZeroPadding2D, Resize, Transpose
+from hls4ml.model.layers import ZeroPadding1D, ZeroPadding2D, Resize, Transpose, Reshape
 from hls4ml.backends.template import LayerConfigTemplate, FunctionCallTemplate
 
 # ZeroPadding templates
@@ -124,4 +124,32 @@ class TransposeFunctionTemplate(FunctionCallTemplate):
         params = self._default_function_params(node)
         params['dim'] = node.get_attr('dim')
 
+        return self.template.format(**params)
+
+# remaining reshapes effectively become NOP
+
+reshape_config_template = 'using {output_t} = {input_t};\n'
+
+reshape_function_template = 'auto& {output} = {input};'
+
+class ReshapeConfigTemplate(LayerConfigTemplate):
+    def __init__(self):
+        super().__init__(Reshape)
+        self.template = reshape_config_template
+
+    def format(self, node):
+        params = {}
+        params['input_t'] = node.get_input_variable().type.name
+        params['output_t'] = node.get_output_variable().type.name
+        return self.template.format(**params)
+
+class ReshapeFucntionTemplate(FunctionCallTemplate):
+    def __init__(self):
+        super().__init__(Reshape)
+        self.template = reshape_function_template
+
+    def format(self, node):
+        params = {}
+        params['input'] = node.get_input_variable().name
+        params['output'] = node.get_output_variable().name
         return self.template.format(**params)
