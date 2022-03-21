@@ -38,6 +38,8 @@ def test_tfc_2w2a():
     config = hls4ml.utils.config_from_onnx_model(model)
     # Some hand-derived config
     # TODO should be auto-derived by QuantizeDenseOutput pass after some adaptation
+    config['Model']['ReuseFactor'] = 16
+    config['Model']['Strategy'] = 'Resource'
     config['LayerName'] = {}
     config['LayerName']['global_in'] = {'Precision' : 'ap_fixed<16,2>'}
     config['LayerName']['Dense_MatMul_0'] = {'Precision' : {'accum' : 'ap_int<10>',

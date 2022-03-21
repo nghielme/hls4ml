@@ -1514,6 +1514,14 @@ class BatchNormalization(Layer):
             self.add_weights_variable(name='scale', var_name='s{index}', data=scale)
             self.add_weights_variable(name='bias', var_name='b{index}', data=bias)
 
+        if self.model.config.is_resource_strategy(self):
+            self.set_attr('strategy', 'resource')
+            if self.model.config.backend.name in ['Vivado', 'VivadoAccelerator']:
+                self.model.config.backend.set_target_reuse_factor(self)
+                self.model.config.backend.set_closest_reuse_factor(self)
+        else:
+            self.set_attr('strategy', 'latency')
+
 
     def function_cpp(self):
         params = self._default_function_params()

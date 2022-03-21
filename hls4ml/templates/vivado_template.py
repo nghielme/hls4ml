@@ -3,6 +3,7 @@ import math
 from bisect import bisect_left
 from queue import Queue
 from collections.abc import Iterable
+from hls4ml.model.hls_layers import BatchNormalization
 
 from hls4ml.templates.templates import Backend
 
@@ -27,6 +28,7 @@ batchnorm_config_template = """struct config{index} : nnet::batchnorm_config {{
     static const unsigned n_in = {n_in};
     static const unsigned n_filt = {n_filt};
     static const unsigned io_type = nnet::{iotype};
+    static const unsigned strategy = nnet::{strategy};
     static const unsigned reuse_factor = {reuse};
     static const unsigned n_scale_bias = {n_scale_bias};
     static const bool store_weights_in_bram = false;
@@ -427,6 +429,17 @@ class VivadoBackend(Backend):
     def get_valid_reuse_factors(self, layer):
         n_in = 0
         n_out = 0
+
+        # do special case for BatchNormalization
+        if isinstance(layer, BatchNormalization):
+            n_in = layer.get_attr('n_in')
+            max_rf = n_in
+            valid_reuse_factors = []
+            for rf in range(1, max_rf + 1):
+                if n_in % rf == 0:
+                    valid_reuse_factors.append(rf)
+            return valid_reuse_factors
+
         if 'Dense' in layer.__class__.__name__:
             n_in = layer.get_attr('n_in')
             n_out = layer.get_attr('n_out')
