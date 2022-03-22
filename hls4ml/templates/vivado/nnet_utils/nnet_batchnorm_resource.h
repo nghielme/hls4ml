@@ -24,11 +24,12 @@
 #include "nnet_dense.h"
 #include "hls_stream.h"
 #include <math.h>
+#include <iostream>
 
 namespace nnet {
 
 template<class data_T, class res_T, typename CONFIG_T>
-void normalize_resource(
+void normalize_resource_reg (
     data_T    data[CONFIG_T::n_in],
     res_T     res[CONFIG_T::n_in],
     typename CONFIG_T::scale_t  scale[CONFIG_T::n_scale_bias],
@@ -40,9 +41,9 @@ void normalize_resource(
     // Use a function_instantiate in case it helps to explicitly optimize unchanging weights/biases
     #pragma HLS function_instantiate variable=scale,bias
 
-    // The configuration might limit reuse_factor, but just in case
-    const int rufactor = CONFIG_T::reuse_factor < CONFIG_T::n_in ? CONFIG_T::reuse_factor : CONFIG_T::n_in;
-    const int block_factor = DIV_ROUNDUP(CONFIG_T::n_in, CONFIG_T::reuse_factor);
+    // The configuration limits reuse_factor to divide n_in evenly (and be no larger than n_in), so these can be simplified:
+    const int rufactor = CONFIG_T::reuse_factor;
+    const int block_factor = CONFIG_T::n_in / CONFIG_T::reuse_factor;
 
     #pragma HLS ARRAY_PARTITION variable=scale complete
     #pragma HLS ARRAY_PARTITION variable=bias complete
@@ -57,17 +58,78 @@ void normalize_resource(
         MultLoop:
         for (int im = 0; im < block_factor; im++) {
             #pragma HLS UNROLL
-
-            if (ires < CONFIG_T::n_in) {
-                if (CONFIG_T::n_filt==-1) {
-                    res[ires] = CONFIG_T::template product<data_T, typename CONFIG_T::scale_t>::product(data[ires], scale[ires]) + bias[ires];
-	            } else {
-                    int norm_index = ires%CONFIG_T::n_filt;
-                    res[ires] = CONFIG_T::template product<data_T, typename CONFIG_T::scale_t>::product(data[ires], scale[norm_index]) + bias[norm_index];
-                }
-            }
+            res[ires] = CONFIG_T::template product<data_T, typename CONFIG_T::scale_t>::product(data[ires], scale[ires]) + bias[ires];
             // Increment in_index
             ires += rufactor;
+        }
+	}
+}
+
+template<class data_T, class res_T, typename CONFIG_T>
+void normalize_resource_conv(
+    data_T    data[CONFIG_T::n_in],
+    res_T     res[CONFIG_T::n_in],
+    typename CONFIG_T::scale_t  scale[CONFIG_T::n_scale_bias],
+    typename CONFIG_T::bias_t   bias[CONFIG_T::n_scale_bias]
+)
+{
+    data_T cache;
+
+    // Use a function_instantiate in case it helps to explicitly optimize unchanging weights/biases
+    #pragma HLS function_instantiate variable=scale,bias
+
+    const int rufactor = CONFIG_T::reuse_factor;
+    const int block_factor = CONFIG_T::n_in / CONFIG_T::reuse_factor;
+
+    #pragma HLS ARRAY_PARTITION variable=scale complete
+    #pragma HLS ARRAY_PARTITION variable=bias complete
+
+    // the configuration makes it so that either block_factor/n_scale_bias or n_scale_bias/block_factor divide evenly
+    // note, n_scale_bias == n_filt
+    if (block_factor <= CONFIG_T::n_scale_bias) {
+
+        // Calcuate result
+        ReuseLoop_lt:
+        for (int ir = 0; ir < rufactor; ir++) {
+            #pragma HLS PIPELINE II=1 rewind
+            int filt = 0;
+            int ires = ir;
+
+            MultLoop_lt:
+            for (int im = 0; im < block_factor; im++) {
+                #pragma HLS UNROLL
+                std::cout << "Lt branch, ires = " << ires << ", filt = " << filt << std::endl;
+                res[ires] = CONFIG_T::template product<data_T, typename CONFIG_T::scale_t>::product(data[ires], scale[filt]) + bias[filt];
+                // Increment in_index
+                ires += rufactor;
+            }
+            filt += 1;
+            if (filt == CONFIG_T::n_scale_bias) {
+                filt = 0;
+            }
+        }
+
+    } else {
+
+        const int subblock_factor = block_factor / CONFIG_T::n_scale_bias;
+
+        // Calcuate result
+        ReuseLoop_gt:
+        for (int ir = 0; ir < rufactor; ir++) {
+            #pragma HLS PIPELINE II=1 rewind
+            int ires = ir;
+
+            filt_loop:
+            for (int filt = 0; filt < CONFIG_T::n_scale_bias; filt++) {
+                #pragma HLS UNROLL
+                subloop:
+                for (int sub = 0; sub < subblock_factor; sub++) {
+                    #pragma HLS UNROLL
+                    std::cout << "gt branch, ires = " << ires << ", filt = " << filt << std::endl;
+                    res[ires] = CONFIG_T::template product<data_T, typename CONFIG_T::scale_t>::product(data[ires], scale[filt]) + bias[filt];
+                    ires += rufactor;
+                }
+            }
         }
 	}
 }

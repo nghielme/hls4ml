@@ -61,8 +61,10 @@ void normalize(
     #pragma HLS inline
     if (CONFIG_T::strategy == nnet::latency) {
         normalize_latency<data_T, res_T, CONFIG_T>(data, res, scale, bias);
+    } else if (CONFIG_T::n_filt==-1) {
+        normalize_resource_reg<data_T, res_T, CONFIG_T>(data, res, scale, bias);
     } else {
-        normalize_resource<data_T, res_T, CONFIG_T>(data, res, scale, bias);
+        normalize_resource_conv<data_T, res_T, CONFIG_T>(data, res, scale, bias);
     }
 }
 
