@@ -1549,6 +1549,13 @@ class ApplyAlpha(BatchNormalization):
         shape = inp.shape
         dims = inp.dim_names
         self.add_output_variable(shape, dims)
+        if self.model.config.is_resource_strategy(self):
+            self.set_attr('strategy', 'resource')
+            if self.model.config.backend.name in ['Vivado', 'VivadoAccelerator']:
+                self.model.config.backend.set_target_reuse_factor(self)
+                self.model.config.backend.set_closest_reuse_factor(self)
+        else:
+            self.set_attr('strategy', 'latency')
 
     def add_weights(self, scale, quantizer=None):
         self.add_weights_variable(name='scale', var_name='s{index}', data=scale, quantizer=quantizer)
