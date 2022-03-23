@@ -41,12 +41,12 @@ void normalize_resource_reg (
     // Use a function_instantiate in case it helps to explicitly optimize unchanging weights/biases
     #pragma HLS function_instantiate variable=scale,bias
 
+    #pragma HLS ARRAY_PARTITION variable=scale complete
+    #pragma HLS ARRAY_PARTITION variable=bias complete
+
     // The configuration limits reuse_factor to divide n_in evenly (and be no larger than n_in), so these can be simplified:
     const int rufactor = CONFIG_T::reuse_factor;
     const int block_factor = CONFIG_T::n_in / CONFIG_T::reuse_factor;
-
-    #pragma HLS ARRAY_PARTITION variable=scale complete
-    #pragma HLS ARRAY_PARTITION variable=bias complete
 
     // Calcuate result
     ReuseLoop:
@@ -75,11 +75,11 @@ void normalize_resource_conv(
     // Use a function_instantiate in case it helps to explicitly optimize unchanging weights/biases
     #pragma HLS function_instantiate variable=scale,bias
 
-    const int rufactor = CONFIG_T::reuse_factor;
-    const int block_factor = CONFIG_T::n_in / CONFIG_T::reuse_factor;
-
     #pragma HLS ARRAY_PARTITION variable=scale complete
     #pragma HLS ARRAY_PARTITION variable=bias complete
+
+    const int rufactor = CONFIG_T::reuse_factor;
+    const int block_factor = CONFIG_T::n_in / CONFIG_T::reuse_factor;
 
     // the configuration makes it so that either block_factor/n_scale_bias or n_scale_bias/block_factor divide evenly
     // note, n_scale_bias == n_filt

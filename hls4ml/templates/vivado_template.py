@@ -414,8 +414,8 @@ class VivadoBackend(Backend):
         self.register_templates('Resize'                 , resize_function_template,      resize_config_template, resize_include_list)
         self.register_templates('Transpose'              , transpose_function_template,   transpose_config_template, transpose_include_list)
         self.register_templates('GarNet'                 , garnet_function_template,      garnet_config_template, garnet_include_list)
-        self.register_templates('GarNetStack'            , garnet_stack_function_template,garnet_stack_config_template, garnet_include_list)        
-    
+        self.register_templates('GarNetStack'            , garnet_stack_function_template,garnet_stack_config_template, garnet_include_list)
+
     def create_initial_config(self, part='xcku115-flvb2104-2-i', board=None, clock_period=5, io_type='io_parallel'):
         config = {}
         config['XilinxPart'] = part if part is not None else 'xcku115-flvb2104-2-i'
@@ -425,7 +425,7 @@ class VivadoBackend(Backend):
         config['HLSConfig'] = {}
 
         return config
-    
+
     def get_valid_reuse_factors(self, layer):
         n_in = 0
         n_out = 0
@@ -437,7 +437,21 @@ class VivadoBackend(Backend):
             valid_reuse_factors = []
             for rf in range(1, max_rf + 1):
                 if n_in % rf == 0:
-                    valid_reuse_factors.append(rf)
+                    # extra requirements in some cases
+                    if layer.get_attr('strategy') == "latency":
+                        valid_reuse_factors.append(rf)
+                    else:
+                        n_filt = layer.get_attr('n_filt')
+                        pass_filt = False
+                        if n_filt == -1:
+                            pass_filt = True
+                        elif rf <= n_filt:
+                            pass_filt = (n_filt % rf == 0)
+                        else:
+                            pass_filt = (rf % n_filt == 0)
+                        if pass_filt:
+                            valid_reuse_factors.append(rf)
+
             return valid_reuse_factors
 
         if 'Dense' in layer.__class__.__name__:
@@ -478,7 +492,7 @@ class VivadoBackend(Backend):
 
     def get_closest_reuse_factor(self, valid_rf, chosen_rf):
         """
-        Returns closest value to chosen_rf. valid_rf is sorted (obtained from get_valid_reuse_factors()) 
+        Returns closest value to chosen_rf. valid_rf is sorted (obtained from get_valid_reuse_factors())
         If two numbers are equally close, return the smallest number.
         """
         pos = bisect_left(valid_rf, chosen_rf)
@@ -501,26 +515,26 @@ class VivadoBackend(Backend):
             print('WARNING: Invalid ReuseFactor={} with "Resource" strategy in layer "{}". Using ReuseFactor={} instead. Valid ReuseFactor(s): {}.'
                 .format(chosen_rf, layer.name, closest_rf, ','.join(map(str, valid_rf))))
             layer.reuse_factor = closest_rf
-    
+
     def set_target_reuse_factor(self, layer):
         targ_cycles = layer.target_cycles
 
         shuffle_cycles = 6 # Number of clock cycles to move data around
         if targ_cycles is not None:
-            if 'Dense' in layer.__class__.__name__: 
+            if 'Dense' in layer.__class__.__name__:
                 kernel_multiplies = layer.get_attr('n_out')
-            elif 'Conv1D' in layer.__class__.__name__:  
+            elif 'Conv1D' in layer.__class__.__name__:
                 kernel_multiplies = layer.get_attr('out_width')
-            elif 'Conv2D' in layer.__class__.__name__: 
+            elif 'Conv2D' in layer.__class__.__name__:
                 kernel_multiplies = layer.get_attr('out_height') * layer.get_attr('out_width')
-            else: 
+            else:
                 print('Target cycles unsupported layer')
                 return
 
             if targ_cycles < shuffle_cycles*kernel_multiplies: # 6 clock min (6 * out_height * out_width)
                 print("Latency can not be achieved with current target %d. Mininum %d." % (targ_cycles, shuffle_cycles*kernel_multiplies+1))
                 return
-            else: 
+            else:
                 rf = targ_cycles - shuffle_cycles*kernel_multiplies # subtract data shuffling overhead
 
             layer.reuse_factor = float(rf) / kernel_multiplies
@@ -611,7 +625,7 @@ class VivadoBackend(Backend):
 
         for i in range(min_W):
             windows_int.append((int(''.join(str(p) for p in reversed(windows_bin[i])), 2)))
-        
+
         return (min_W, windows_int)
 
     def compute_conv2d_instructions(self, in_H, in_W, in_C, kernel_size=3, stride=1, pad=0):
@@ -639,7 +653,7 @@ class VivadoBackend(Backend):
             min_H = (math.ceil(kernel_height / stride_height) - 1) * stride_height + kernel_height
         else:
             min_H = (math.ceil(stride_height / kernel_height) - 1) * stride_height + kernel_height
-        
+
         if kernel_width >= stride_width:
             min_W = (math.ceil(kernel_width / stride_width) - 1) * stride_width + kernel_width
         else:
@@ -686,5 +700,5 @@ class VivadoBackend(Backend):
         for i in range(min_H):
             for j in range(min_W):
                 windows_int.append((int(''.join(str(p) for p in reversed(windows_bin[i * min_W + j])), 2)))
-        
+
         return (min_H, min_W, windows_int)

@@ -24,6 +24,8 @@
 #include "nnet_mult.h"
 #include "nnet_types.h"
 #include "hls_stream.h"
+#include "nnet_batchnorm_stream_latency.h"
+#include "nnet_batchnorm_stream_resource.h"
 
 namespace nnet {
 
@@ -37,33 +39,15 @@ void normalize(
     hls::stream<res_T>  &res,
     typename CONFIG_T::scale_t scale[CONFIG_T::n_scale_bias],
     typename CONFIG_T::bias_t  bias[CONFIG_T::n_scale_bias]
-) {
-    #pragma HLS ARRAY_PARTITION variable=scale complete
-    #pragma HLS ARRAY_PARTITION variable=bias complete
-
-    constexpr unsigned multiplier_limit = DIV_ROUNDUP(CONFIG_T::n_in, CONFIG_T::reuse_factor);
-    constexpr unsigned ii = CONFIG_T::n_in / multiplier_limit;
-    CONFIG_T::template product<typename data_T::value_type, typename CONFIG_T::scale_t>::limit(multiplier_limit);
-
-    BatchNormLoop: for (int i = 0; i < CONFIG_T::n_in / data_T::size; i++) {
-        #pragma HLS PIPELINE II=ii
-
-        data_T in_data = data.read();
-        res_T out_data;
-        #pragma HLS DATA_PACK variable=out_data
-
-        BatchNormpack: for (int j = 0; j < data_T::size; j++) {
-            #pragma HLS UNROLL
-            int norm_index;
-            if (CONFIG_T::n_filt==-1) {
-                norm_index = i * data_T::size + j;
-            } else {
-                norm_index = j % CONFIG_T::n_filt;
-            }
-            out_data[j] = CONFIG_T::template product<typename data_T::value_type, typename CONFIG_T::scale_t>::product(in_data[j], scale[norm_index]) + bias[norm_index];
-        }
-
-        res.write(out_data);
+)
+{
+    #pragma HLS inline
+    if (CONFIG_T::strategy == nnet::latency) {
+        normalize_latency<data_T, res_T, CONFIG_T>(data, res, scale, bias);
+    } else if (CONFIG_T::n_filt==-1) {
+        normalize_resource_reg<data_T, res_T, CONFIG_T>(data, res, scale, bias);
+    } else {
+        normalize_resource_conv<data_T, res_T, CONFIG_T>(data, res, scale, bias);
     }
 }
 
@@ -113,7 +97,7 @@ void normalize_ternary_tanh(
 
         BatchNormPack: for (int j = 0; j < data_T::size; j++) {
             #pragma HLS UNROLL
-            
+
             int norm_index = i * data_T::size + j;
 
             if (in_data[j] > threshold_hi[norm_index]) {
