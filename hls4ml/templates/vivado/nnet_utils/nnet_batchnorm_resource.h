@@ -50,17 +50,14 @@ void normalize_resource_reg (
 
     // Calcuate result
     ReuseLoop:
-    for (int ir = 0; ir < rufactor; ir++) {
+    for (int ib = 0; ib < CONFIG_T::n_in; ib += block_factor) {
         #pragma HLS PIPELINE II=1 rewind
-
-        int ires = ir;
 
         MultLoop:
         for (int im = 0; im < block_factor; im++) {
             #pragma HLS UNROLL
+            const int ires = ib + im;
             res[ires] = CONFIG_T::template product<data_T, typename CONFIG_T::scale_t>::product(data[ires], scale[ires]) + bias[ires];
-            // Increment in_index
-            ires += rufactor;
         }
 	}
 }
