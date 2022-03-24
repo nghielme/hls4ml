@@ -272,8 +272,11 @@ class Reshape(Layer):
         dims = ['N_SIZE_{}_{}'.format(i, self.index) for i in range(1, len(shape) + 1)]
 
         out_name = self.outputs[0]
-        proxy = self.get_input_variable()
-        out = InplaceVariable(shape, dims, proxy)
+
+        # don't allow precision change in reshape layer
+        precision = self.get_input_variable().type.precision
+
+        out = InplaceVariable(shape, dims, precision=precision, index=self.index)
 
         self.set_attr(out_name, out)
 

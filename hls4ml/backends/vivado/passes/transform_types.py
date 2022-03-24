@@ -15,9 +15,11 @@ class TransformTypes(GlobalOptimizerPass):
     def transform(self, model, node):
         io_type = node.model.config.get_config_value('IOType')
 
+        itens = list(node.variables.items())
         for out_name, var in node.variables.items():
             if isinstance(var, InplaceVariable):
                 new_var = self.inplace_var_converter.convert(var, io_type)
+                # continue
             if io_type == 'io_stream':
                 new_var = self.stream_var_converter.convert(var)
             elif io_type == 'io_serial':

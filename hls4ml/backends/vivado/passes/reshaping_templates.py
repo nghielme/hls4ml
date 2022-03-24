@@ -128,7 +128,8 @@ class TransposeFunctionTemplate(FunctionCallTemplate):
 
 # remaining reshapes effectively become NOP
 
-reshape_config_template = 'using {output_t} = {input_t};\n'
+#reshape_config_template = 'using {output_t} = {input_t};\n'
+reshape_config_template = ''
 
 reshape_function_template = 'auto& {output} = {input};'
 

@@ -208,15 +208,19 @@ class TensorVariable(Variable):
         return '*'.join([str(k) for k in self.dim_names])
 
 class InplaceVariable(Variable):
-    def __init__(self, shape, dim_names, proxy):
+    def __init__(self, shape, dim_names, var_name='layer{index}', type_name='layer{index}_t', precision=None, **kwargs):
+        super().__init__(var_name, NamedType(type_name, precision, **kwargs), **kwargs)
         self.shape = shape
         self.dim_names = dim_names
-        self.type = proxy.type
-        self.name = proxy.name
-        self.size = proxy.size
 
     def get_shape(self):
         return zip(self.dim_names, self.shape)
+
+    def size(self):
+        nelem = 1
+        for dim in self.shape:
+            nelem *= dim
+        return nelem
 
     def size_cpp(self):
         return '*'.join([str(k) for k in self.dim_names])
