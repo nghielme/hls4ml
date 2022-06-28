@@ -467,6 +467,11 @@ class CatapultWriter(Writer):
                 newline = line
                 for bram in model_brams:
                     newline += '#include \"firmware/weights/{}.h\"\n'.format(bram.cppname)
+            elif '//hls-fpga-machine-learning insert declare weights' in line:
+                newline = line
+                for layer in model.get_layers():
+                    for w in layer.get_weights():
+                        newline += w.definition_cpp() +";\n"
             elif '//hls-fpga-machine-learning insert header' in line:
                 dtype = line.split('#', 1)[1].strip()
                 inputs_str = ', '.join(['{type} {name}[{shape}]'.format(type=dtype, name=i.cppname, shape=i.size_cpp()) for i in model_inputs])

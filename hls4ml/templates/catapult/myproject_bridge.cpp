@@ -8,6 +8,7 @@
 
 //hls-fpga-machine-learning insert bram
 
+//hls-fpga-machine-learning insert declare weights
 
 namespace nnet {
     bool trace_enabled = false;
