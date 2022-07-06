@@ -149,10 +149,14 @@ void load_exponent_weights_from_txt(T *w, const char* fname) {
             std::replace(token.begin(), token.end(), ',', ' ');
             std::istringstream structss(token);
 
-            if(!(structss >> w[i].sign >> w[i].weight)) {
+            int sign;
+            double weight;
+            if(!(structss >> sign >> weight)) {
                 std::cerr << "ERROR: Unable to parse file " << std::string(fname);
                 exit(1);
             }
+            w[i].sign = sign;
+            w[i].weight = weight;
             i++;
         }
 
