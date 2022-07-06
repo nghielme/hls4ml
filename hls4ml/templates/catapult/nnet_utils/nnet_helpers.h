@@ -210,7 +210,7 @@ extern size_t trace_type_size;
 template<class data_T, class save_T>
 void save_output_array(data_T *data, save_T *ptr, size_t layer_size) {
     for(int i = 0; i < layer_size; i++) {
-        ptr[i] = save_T(data[i]);
+        ptr[i] = static_cast<save_T>(data[i].to_double());
     }
 }
 
@@ -250,7 +250,7 @@ void save_layer_output(data_T *data, const char *layer_name, size_t layer_size) 
         out.open(filename.str(), std::ios::app);
         assert(out.is_open());
         for(int i = 0; i < layer_size; i++) {
-            out << float(data[i]) << " "; // We don't care about precision in text files
+            out << data[i] << " "; // We don't care about precision in text files
         }
         out << std::endl;
         out.close();

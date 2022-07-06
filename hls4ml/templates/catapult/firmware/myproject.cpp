@@ -30,14 +30,12 @@ void CCS_BLOCK(myproject)(
 
     //hls-fpga-machine-learning insert IO
 
-#if 0
 #ifndef __SYNTHESIS__
     static bool loaded_weights = false;
     if (!loaded_weights) {
         //hls-fpga-machine-learning insert load weights
         loaded_weights = true;
     }
-#endif
 #endif
 
     // ****************************************
