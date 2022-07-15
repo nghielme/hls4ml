@@ -134,6 +134,10 @@ class stream
         _name = name;
     }
 
+    void setName(const std::string name) {
+        _name = name;
+    }
+
   /// Make copy constructor and assignment operator private
   private:
     stream(const stream< __STREAM_T__ >& chn):
@@ -165,7 +169,8 @@ class stream
         {
             std::cout << "WARNING: Hls::stream '" 
                       << _name 
-                      << "' contains leftover data,"
+                      << "' contains leftover data of size "
+                      << _data.size()
                       << " which may result in RTL simulation hanging."
                       << std::endl;
         }

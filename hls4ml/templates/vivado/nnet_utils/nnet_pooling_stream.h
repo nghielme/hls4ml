@@ -7,6 +7,7 @@
 #include "nnet_pooling.h"
 #include "nnet_conv_stream.h"
 #include "hls_stream.h"
+#include <sstream>
 
 namespace nnet {
 
@@ -350,6 +351,9 @@ void pooling1d_encoded_cl(
     hls::stream<typename data_T::value_type> data_window[CONFIG_T::pool_width * CONFIG_T::n_filt];
     constexpr int win_depth = CONFIG_T::n_out;
     for (unsigned i_out = 0; i_out < CONFIG_T::pool_width * CONFIG_T::n_filt; i_out++) {
+        std::stringstream namess;
+        namess << "pooling_" << CONFIG_T::n_in << "_" << i_out;
+        data_window[i_out].setName(namess.str());
         #pragma HLS STREAM variable=data_window[i_out] depth=win_depth
     }
 

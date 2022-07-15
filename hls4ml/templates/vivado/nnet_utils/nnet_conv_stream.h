@@ -5,6 +5,7 @@
 #include "nnet_common.h"
 #include "hls_stream.h"
 #include "nnet_dense.h"
+#include <iostream>
 
 namespace nnet {
 
@@ -23,6 +24,9 @@ unsigned scale_index_K_gte_S(const unsigned idx) {
 
     constexpr unsigned nW = ((W - K) / S) * S + K; // Nearest W without unused pixels on the right
     constexpr unsigned sW = (DIV_ROUNDUP(K, S) - 1) * S + K; // Scaled W that behaves like original W
+    if (W == 11) {
+        std::cout << "idx = " << idx << ", nW = " << nW << ", sW = " << sW << std::endl;
+    }
     if (idx >= nW) {
         return sW;
     }

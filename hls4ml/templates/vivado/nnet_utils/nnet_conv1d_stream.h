@@ -4,6 +4,8 @@
 #include "nnet_common.h"
 #include "nnet_conv_stream.h"
 #include "hls_stream.h"
+#include <sstream>
+#include <iostream>
 
 namespace nnet {
 
@@ -16,8 +18,11 @@ void compute_scaled_indices_1d(
 
     ComputeIndex: for (unsigned p = 0; p < data_T::size / CONFIG_T::n_chan; p++) {
         #pragma HLS UNROLL
-
         unsigned sw_idx = scale_index<CONFIG_T::filt_width, CONFIG_T::stride_width, CONFIG_T::in_width>(wp_idx + p);
+
+    if (CONFIG_T::in_width == 11) {
+        std::cout << "wp_idx = " << wp_idx << ", sw_idx = " << sw_idx << std::endl;
+    }
         pixel_idx[p] = CONFIG_T::pixels[sw_idx];
     }
 }
@@ -34,6 +39,9 @@ void conv_1d_encoded_cl(
     hls::stream<typename data_T::value_type> data_window[CONFIG_T::filt_width * CONFIG_T::n_chan];
     const int win_depth = CONFIG_T::out_width;
     for (unsigned i_out = 0; i_out < CONFIG_T::filt_width * CONFIG_T::n_chan; i_out++) {
+        std::stringstream namess;
+        namess << "conv1d_" << CONFIG_T::in_width << "_" << i_out;
+        data_window[i_out].setName(namess.str());
         #pragma HLS STREAM variable=data_window[i_out] depth=win_depth
     }
 
@@ -43,6 +51,8 @@ void conv_1d_encoded_cl(
     #pragma HLS DATA_PACK variable=res_pack
     unsigned outputs_ready = 0;
 
+    std::cout << "conv1d_" << CONFIG_T::in_width << " data_T::size = " << data_T::size << " CONFIG_T::n_chan = " << CONFIG_T::n_chan 
+        << " divided = " << data_T::size / CONFIG_T::n_chan << std::endl;
     ap_uint<CONFIG_T::filt_width> pixel_idx[data_T::size / CONFIG_T::n_chan];
     #pragma HLS ARRAY_PARTITION variable=pixel_idx complete
 
@@ -52,6 +62,9 @@ void conv_1d_encoded_cl(
             #pragma HLS PIPELINE II=CONFIG_T::reuse_factor
         }
         compute_scaled_indices_1d<data_T, CONFIG_T>(i_iw, pixel_idx);
+        if (CONFIG_T::in_width == 11) {
+            std::cout << "i_iw = " << i_iw << " pixel_idx = " << std::hex << pixel_idx[0] << std::dec << std::endl;
+        }
         compute_output_encoded<data_T, res_T, CONFIG_T>(data.read(), data_window, res, res_pack, outputs_ready, weights, biases, pixel_idx);
     }
 }
