@@ -160,8 +160,7 @@ void kernel_shift_1d(
     typename data_T::value_type kernel_window[CONFIG_T::filt_width * CONFIG_T::n_chan]
 ) {
     #pragma HLS inline
-    #pragma HLS PIPELINE II = 1
-    
+
     // Shift kernel_window by one step to the left (manual shift operation)
     static const int filt_width = CONFIG_T::filt_width - 1;
     KernelShiftWidth: for (int i_iw = 0; i_iw < filt_width; i_iw++) {
