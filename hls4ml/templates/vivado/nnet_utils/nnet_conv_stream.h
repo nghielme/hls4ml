@@ -164,8 +164,9 @@ void kernel_shift_1d(
     // Shift kernel_window by one step to the left (manual shift operation)
     static const int filt_width = CONFIG_T::filt_width - 1;
     KernelShiftWidth: for (int i_iw = 0; i_iw < filt_width; i_iw++) {
-        #pragma HLS UNROLL
+        #pragma HLS PIPELINE II = 1
         KernelShiftChannel: for (unsigned i_ic = 0; i_ic < CONFIG_T::n_chan; i_ic++) {
+            #pragma HLS UNROLL
             // Shift every element in kernel_window to the left
             kernel_window[i_iw * CONFIG_T::n_chan + i_ic] = kernel_window[(i_iw + 1) * CONFIG_T::n_chan + i_ic];
         }
