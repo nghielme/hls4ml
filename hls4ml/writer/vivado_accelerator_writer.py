@@ -45,7 +45,7 @@ class VivadoAcceleratorWriter(VivadoWriter):
                                indent + 'in_struct(const T_in& data, const ap_uint<1>& last){this->data = data; this->last = last;};\n' + \
                                indent + 'in_struct(){this->data = 0; this->last = 0;};\n' + \
                                indent + 'friend std::ostream& operator<<(std::ostream& stream, const in_struct& in)\n' + \
-                               indent + '{ return stream << "{ data: " << in.data << ", last: " << in.last << " }" << std::endl; }\n' + \
+                               indent + '{ return stream << "{ data: " << float(in.data) << ", last: " << float(in.last) << " }" << std::endl; }\n' + \
                                indent + 'operator float() const {return this->data;}\n' + \
                                indent + 'operator double() const {return this->data;}\n' + \
                                indent + 'in_struct(float data) {this->data = data; this->last = 0;}\n' + \
@@ -57,7 +57,7 @@ class VivadoAcceleratorWriter(VivadoWriter):
                                indent + 'out_struct(const T_out& data, const ap_uint<1>& last){this->data = data; this->last = last;};\n' + \
                                indent + 'out_struct(){this->data = 0; this->last = 0;};\n' + \
                                indent + 'friend std::ostream& operator<<(std::ostream& stream, const out_struct& out)\n' + \
-                               indent + '{ return stream << "{ data: " << out.data << ", last: " << out.last << " }" << std::endl; }\n' + \
+                               indent + '{ return stream << "{ data: " << float(out.data) << ", last: " << float(out.last) << " }" << std::endl; }\n' + \
                                indent + 'operator float() const {return this->data;}\n' + \
                                indent + 'operator double() const {return this->data;}\n' + \
                                indent + 'out_struct(float data) {this->data = data; this->last = 0;}\n' + \
