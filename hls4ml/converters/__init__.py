@@ -11,7 +11,7 @@ from hls4ml.converters.keras_to_hls import keras_to_hls, get_supported_keras_lay
 try:
     from hls4ml.converters.pytorch_to_hls import pytorch_to_hls, get_supported_pytorch_layers, register_pytorch_layer_handler
     __pytorch_enabled__ = True
-except ImportError:
+except:
     warnings.warn("WARNING: Pytorch converter is not enabled!")
     __pytorch_enabled__ = False
 
@@ -52,7 +52,7 @@ for model_type in model_types:
                         elif model_type == 'onnx':
                             register_onnx_layer_handler(layer, func)
 
-        except ImportError:
+        except:
             continue
 
 def parse_yaml_config(config_file):

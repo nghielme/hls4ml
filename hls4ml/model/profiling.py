@@ -20,7 +20,7 @@ except ImportError:
 try:
     import torch
     __torch_profiling_enabled__ = True
-except ImportError:
+except:
     __torch_profiling_enabled__ = False
 
 
