@@ -8,6 +8,7 @@ class VivadoAcceleratorWriter(VivadoWriter):
     def __init__(self):
         super().__init__()
         self.vivado_accelerator_config = None
+        self.write_custom = lambda *args, **kwargs: None
 
     def write_axi_wrapper(self, model):
         ''' Write a top level HLS C++ file to wrap the hls4ml project with AXI interfaces
@@ -364,5 +365,6 @@ class VivadoAcceleratorWriter(VivadoWriter):
         self.write_wrapper_test(model)
         self.write_axi_wrapper(model)
         self.modify_build_script(model)
+        self.write_custom(self, model)
         self.write_new_tar(model)
 
