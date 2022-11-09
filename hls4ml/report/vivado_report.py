@@ -13,7 +13,7 @@ def read_vivado_report(hls_dir, full_report=False):
     top_func_name = None
 
     if os.path.isfile(hls_dir + '/build_prj.tcl'):
-        prj_dir, top_func_name = _parse_build_script(hls_dir + '/build_prj.tcl')
+        prj_dir, top_func_name = _parse_build_script(hls_dir)
 
     if prj_dir is None or top_func_name is None:
         print('Unable to read project data. Exiting.')
