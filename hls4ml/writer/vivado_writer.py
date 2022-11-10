@@ -670,5 +670,5 @@ class VivadoWriter(Writer):
         self.write_nnet_utils(model)
         self.write_generated_code(model)
         self.write_yml(model)
-        self.write_tar(model)
+        # self.write_tar(model)
         print('Done')
