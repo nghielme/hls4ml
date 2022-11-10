@@ -58,10 +58,13 @@ class IntegerPrecisionType(PrecisionType):
         self.fractional = 0
 
     def __str__(self):
-        typestring = '{signed}int<{width}>'.format(signed='u' if not self.signed else '', width=self.width)
+        typestring = 'ap_{signed}int<{width}>'.format(signed='u' if not self.signed else '', width=self.width)
         return typestring
 
     def __eq__(self, other):
+        if not isinstance(other, type(self)):
+          return False
+
         eq = self.width == other.width
         eq = eq and self.signed == other.signed
         # These are probably unnecessary

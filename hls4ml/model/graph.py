@@ -625,6 +625,9 @@ class ModelGraph(object):
         elif x0.dtype in [np.double, np.float64, np.float_]:
             top_function = getattr(self._top_function_lib, self.config.get_project_name() + '_double')
             ctype = ctypes.c_double
+        elif x0.dtype in [np.uint32]:
+            top_function = getattr(self._top_function_lib, self.config.get_project_name() + '_uint32')
+            ctype = ctypes.c_uint32
         else:
             raise Exception('Invalid type ({}) of numpy array. Supported types are: single, float32, double, float64, float_.'.format(x0.dtype))
 
@@ -642,6 +645,9 @@ class ModelGraph(object):
         n_samples = []
         for i, xi in enumerate(xlist):
             expected_size = self.get_input_variables()[i].size()
+            if np.issubdtype(x.dtype, np.integer):
+              expected_size //= 4
+
             x_size = np.prod(xi.shape)
             n_sample, rem = divmod(x_size, expected_size)
             if rem != 0:
@@ -738,7 +744,7 @@ class ModelGraph(object):
             x = [x]
 
         try:
-            alloc_func(ctypes.sizeof(ctype))
+            alloc_func(ctypes.sizeof(ctypes.c_float))
 
             for i in range(n_samples):
                 predictions = [np.zeros(yj.size(), dtype=ctype) for yj in self.get_output_variables()]
@@ -754,7 +760,7 @@ class ModelGraph(object):
                 collect_func(trace_data)
                 for trace in trace_data:
                     layer_name = str(trace.name, 'utf-8')
-                    layer_data = ctypes.cast(trace.data, ctypes.POINTER(ctype))
+                    layer_data = ctypes.cast(trace.data, ctypes.POINTER(ctypes.c_float))
                     np_array = np.ctypeslib.as_array(layer_data, shape=layer_sizes[layer_name])
                     trace_output[layer_name].append(np.copy(np_array))
 
