@@ -603,7 +603,7 @@ class ModelGraph(object):
             dlclose_func(self._top_function_lib._handle)
         self._top_function_lib = ctypes.cdll.LoadLibrary(lib_name)
 
-    def _get_top_function(self, x):
+    def _get_top_function(self, x, y_dtype = None):
         if self._top_function_lib is None:
             raise Exception('Model not compiled')
         if len(self.get_input_variables()) == 1:
@@ -621,21 +621,24 @@ class ModelGraph(object):
         x0 = xlist[0]
         if x0.dtype in [np.single, np.float32]:
             top_function = getattr(self._top_function_lib, self.config.get_project_name() + '_float')
-            ctype = ctypes.c_float
+            i_ctype = o_ctype = ctypes.c_float
         elif x0.dtype in [np.double, np.float64, np.float_]:
             top_function = getattr(self._top_function_lib, self.config.get_project_name() + '_double')
-            ctype = ctypes.c_double
-        elif x0.dtype in [np.uint32]:
-            top_function = getattr(self._top_function_lib, self.config.get_project_name() + '_uint32')
-            ctype = ctypes.c_uint32
+            i_ctype = o_ctype = ctypes.c_double
+        elif np.issubdtype(x0.dtype, np.integer):
+            if y_dtype is None:
+              y_dtype = x0.dtype
+            top_function = getattr(self._top_function_lib, self.config.get_project_name() + f'_{x0.dtype}_{y_dtype}')
+            i_ctype = getattr(ctypes, f"c_{x0.dtype}")
+            o_ctype = getattr(ctypes, f"c_{y_dtype}")
         else:
-            raise Exception('Invalid type ({}) of numpy array. Supported types are: single, float32, double, float64, float_.'.format(x0.dtype))
-
+            raise Exception('Invalid type ({}) of numpy array. Supported types are: integer, single, float32, double, float64, float_.'.format(x0.dtype))
 
         top_function.restype = None
-        top_function.argtypes = [npc.ndpointer(ctype, flags="C_CONTIGUOUS") for i in range(len(xlist) + n_outputs)]
+        top_function.argtypes = [npc.ndpointer(i_ctype, flags="C_CONTIGUOUS") for _ in range(len(xlist))] + \
+                                [npc.ndpointer(o_ctype, flags="C_CONTIGUOUS") for _ in range(n_outputs)]
 
-        return top_function, ctype
+        return top_function, o_ctype
 
     def _compute_n_samples(self, x):
         if len(self.get_input_variables()) == 1:
@@ -646,7 +649,13 @@ class ModelGraph(object):
         for i, xi in enumerate(xlist):
             expected_size = self.get_input_variables()[i].size()
             if np.issubdtype(x.dtype, np.integer):
-              expected_size //= 4
+              axi_bitwidth = (x.dtype.itemsize * 8)
+              input_bitwidth = self.get_input_variables()[i].type.precision.width
+              words_per_cycle = axi_bitwidth // input_bitwidth
+              print('AXI bitwidth:', axi_bitwidth)
+              print('IN bitwidth:', input_bitwidth)
+              print('words per cycle:', words_per_cycle)
+              expected_size //= words_per_cycle
 
             x_size = np.prod(xi.shape)
             n_sample, rem = divmod(x_size, expected_size)
@@ -659,8 +668,8 @@ class ModelGraph(object):
 
         return int(n_sample)
 
-    def predict(self, x):
-        top_function, ctype = self._get_top_function(x)
+    def predict(self, x, y_dtype = None):
+        top_function, o_ctype = self._get_top_function(x, y_dtype)
         n_samples = self._compute_n_samples(x)
         n_inputs = len(self.get_input_variables())
         n_outputs = len(self.get_output_variables())
@@ -674,7 +683,7 @@ class ModelGraph(object):
 
         try:
             for i in range(n_samples):
-                predictions = [np.zeros(yj.size(), dtype=ctype) for yj in self.get_output_variables()]
+                predictions = [np.zeros(yj.size(), dtype=o_ctype) for yj in self.get_output_variables()]
                 if n_inputs == 1:
                     inp = [np.asarray(x[i])]
                 else:
@@ -700,12 +709,12 @@ class ModelGraph(object):
         else:
             return output
 
-    def trace(self, x):
+    def trace(self, x, y_dtype = None):
         print('Recompiling {} with tracing'.format(self.config.get_project_name()))
         self.config.trace_output = True
         self.compile()
 
-        top_function, ctype = self._get_top_function(x)
+        top_function, o_ctype = self._get_top_function(x, y_dtype)
         n_samples = self._compute_n_samples(x)
         n_inputs = len(self.get_input_variables())
         n_outputs = len(self.get_output_variables())
@@ -747,7 +756,7 @@ class ModelGraph(object):
             alloc_func(ctypes.sizeof(ctypes.c_float))
 
             for i in range(n_samples):
-                predictions = [np.zeros(yj.size(), dtype=ctype) for yj in self.get_output_variables()]
+                predictions = [np.zeros(yj.size(), dtype=o_ctype) for yj in self.get_output_variables()]
                 if n_inputs == 1:
                     inp = [np.asarray(x[i])]
                 else:
