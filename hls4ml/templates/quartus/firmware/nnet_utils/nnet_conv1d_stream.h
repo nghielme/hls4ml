@@ -115,7 +115,7 @@ void compute_output_buffer_1d(
     // Check to see if we have a full kernel
     if ((sX - lShiftX) == 0 && pX > (lShiftX - 1)) {        
         // Step 3 - Dense matrix multiplication
-        hls_register typename res_T::value_type res_out[CONFIG_T::n_filt];
+        typename res_T::value_type res_out[CONFIG_T::n_filt];
         dense_resource<typename data_T::value_type, typename res_T::value_type, typename CONFIG_T::mult_config>(kernel_window, res_out, weights, biases);
     
         // Write result to output stream
@@ -152,7 +152,7 @@ void conv_1d_cl(
     hls_register static typename data_T::value_type kernel_window[CONFIG_T::filt_width * CONFIG_T::n_chan];
 
     // An array of length CONFIG_T::n_chan, with elements set to zero (padding for each channel)
-    static const data_T padds(0);
+    const data_T padds(0);
 
     // Input image left-side padding
     PaddingLeftWidth: 
