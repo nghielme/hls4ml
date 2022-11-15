@@ -17,11 +17,11 @@
 #define hls_register
 
 #include "stream.h"
-template<typename T>
+template<typename T, int N=100>
 using stream = nnet::stream<T>;
-template<typename T>
+template<typename T, int N=100>
 using stream_in = nnet::stream<T>;
-template<typename T>
+template<typename T, int N=100>
 using stream_out = nnet::stream<T>;
 
 #else
@@ -30,12 +30,12 @@ using stream_out = nnet::stream<T>;
 #include "HLS/ac_int.h"
 #include "HLS/ac_fixed.h"
 
-template<typename T>
-using stream = ihc::stream<T>;
-template<typename T>
-using stream_in = ihc::stream_in<T>;
-template<typename T>
-using stream_out = ihc::stream_out<T>;
+template<typename T, int N=100>
+using stream = ihc::stream<T, ihc::buffer<N>>;
+template<typename T, int N=100>
+using stream_in = ihc::stream_in<T, ihc::buffer<N>>;
+template<typename T, int N=100>
+using stream_out = ihc::stream_out<T, ihc::buffer<N>>;
 
 #endif
 
