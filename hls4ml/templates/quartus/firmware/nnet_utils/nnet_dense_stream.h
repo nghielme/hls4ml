@@ -15,7 +15,7 @@ void dense_resource(
     const typename CONFIG_T::bias_t   biases[CONFIG_T::n_out])
 {
     hls_register typename data_T::value_type data[CONFIG_T::n_in];
-    hls_register typename res_T::value_type res[CONFIG_T::n_out];
+    typename res_T::value_type res[CONFIG_T::n_out];
     
     DataPrepare: 
     #pragma ii 1
