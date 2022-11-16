@@ -658,11 +658,9 @@ class ModelGraph(object):
             if np.issubdtype(x.dtype, np.integer):
               x_bitwidth = (x.dtype.itemsize * 8)
               input_bitwidth = self.get_input_variables()[i].type.precision.width
-              in_per_x = x_bitwidth // input_bitwidth
               print('X bitwidth:', x_bitwidth)
               print('IN bitwidth:', input_bitwidth)
-              print('IN per X:', in_per_x)
-              expected_size //= in_per_x
+              expected_size = (expected_size * input_bitwidth) // x_bitwidth
 
             x_size = np.prod(xi.shape)
             n_sample, rem = divmod(x_size, expected_size)
