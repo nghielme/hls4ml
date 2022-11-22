@@ -337,7 +337,7 @@ class VivadoInplaceStreamVariableConverter(InplaceStreamVariableConverter):
 
 class QuartusInplaceStreamVariableConverter(InplaceStreamVariableConverter):
     def __init__(self, type_converter):
-        super().__init__(type_converter=type_converter, prefix='Quartus', definition_cls=VivadoInplaceStreamVariableDefinition)
+        super().__init__(type_converter=type_converter, prefix='Quartus', definition_cls=QuartusInplaceStreamVariableDefinition)
 
 #endregion
 
