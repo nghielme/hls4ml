@@ -61,7 +61,7 @@ def _get_precision_from_quantizer(quantizer):
     else:
         return 'ap_{}int<{}>'.format(signed, bits)
 
-def config_from_keras_model(model, granularity='model', default_precision='ap_fixed<16,6>', default_reuse_factor=1):
+def config_from_keras_model(model, granularity='model', default_precision='ap_fixed<16,6>', default_reuse_factor=1, extra_layers=[]):
     """Create an HLS conversion config given the Keras model.
 
     This function serves as the initial step in creating the custom conversion configuration.
@@ -115,7 +115,8 @@ def config_from_keras_model(model, granularity='model', default_precision='ap_fi
     #Define layers to skip because they're not configurable or not converted to HLS
     skip_layers = ['Dropout', 'Flatten', 'Reshape', 'Permute']
     #All supported layers
-    supported_layers = core_layers + dense_layers + conv_layers + pooling_layers + norm_layers + activation_layers + merge_layers + qkeras_layers + upsampling_layers + reshaping_layers + graph_layers + rnn_layers + skip_layers
+    supported_layers = (core_layers + dense_layers + conv_layers + pooling_layers + norm_layers + activation_layers + merge_layers
+        + qkeras_layers + upsampling_layers + reshaping_layers + graph_layers + rnn_layers + skip_layers + extra_layers)
 
     keras_layer_config = None
     if model_arch['class_name'] == 'Sequential':
