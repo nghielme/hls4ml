@@ -18,6 +18,7 @@
 //
 #include <fstream>
 #include <iostream>
+#include <sstream>
 #include <algorithm>
 #include <vector>
 #include <map>
@@ -57,22 +58,21 @@ int main(int argc, char **argv)
   int e = 0;
 
   if (fin.is_open() && fpr.is_open()) {
-    while ( std::getline(fin,iline) && std::getline (fpr,pline) ) {
+    while ( std::getline(fin, iline) && std::getline(fpr, pline) ) {
       if (e % CHECKPOINT == 0) std::cout << "Processing input " << e << std::endl;
-      char* cstr=const_cast<char*>(iline.c_str());
-      char* current;
+
       std::vector<float> in;
-      current=strtok(cstr," ");
-      while(current!=NULL) {
-        in.push_back(atof(current));
-        current=strtok(NULL," ");
+      std::istringstream iss(iline);
+      float idat;
+      while(iss >> idat) {
+        in.push_back(idat);
       }
-      cstr=const_cast<char*>(pline.c_str());
+
       std::vector<float> pr;
-      current=strtok(cstr," ");
-      while(current!=NULL) {
-        pr.push_back(atof(current));
-        current=strtok(NULL," ");
+      std::istringstream pss(pline);
+      float pdat;
+      while(pss >> pdat) {
+        pr.push_back(pdat);
       }
 
       //hls-fpga-machine-learning insert data
