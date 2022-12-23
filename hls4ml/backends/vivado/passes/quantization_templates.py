@@ -1,5 +1,5 @@
 from hls4ml.backends.backend import get_backend
-from hls4ml.model.optimizer.passes.qkeras import ApplyAlpha
+from hls4ml.model.layers import ApplyAlpha
 from hls4ml.backends.template import LayerConfigTemplate, FunctionCallTemplate
 from hls4ml.backends.vivado.passes.core_templates import batchnorm_config_template, batchnorm_function_template, batchnorm_include_list
 

@@ -18,7 +18,6 @@ from hls4ml.model.types import (
     ExponentPrecisionType,
     ExponentWeightVariable,
     FixedPrecisionType,
-    InplaceVariable,
     IntegerPrecisionType,
     NamedType,
     TensorVariable,

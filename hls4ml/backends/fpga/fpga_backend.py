@@ -29,7 +29,7 @@ from hls4ml.model.layers import (
     SimpleRNN,
     Softmax,
 )
-from hls4ml.model.optimizer import model_optimizer
+from hls4ml.model.optimizer import model_optimizer, layer_optimizer
 from hls4ml.model.types import (
     ExponentPrecisionType,
     FixedPrecisionType,
