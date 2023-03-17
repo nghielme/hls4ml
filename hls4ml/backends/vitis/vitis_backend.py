@@ -1,29 +1,101 @@
 import os
 import sys
 
-from hls4ml.backends import VivadoBackend
-from hls4ml.model.flow import register_flow, get_flow
+from hls4ml.backends import XilinxBackend
+from hls4ml.model.flow import register_flow
 from hls4ml.report import parse_vivado_report
+from hls4ml.model.optimizer import get_backend_passes
 
 
-class VitisBackend(VivadoBackend):
-    def __init__(self):
-        super(VivadoBackend, self).__init__(name='Vitis')
-        self._register_layer_attributes()
-        self._register_flows()
+class VitisBackend(XilinxBackend):
+    def __init__(self, name='Vitis'):
+        super().__init__(name)
+
 
     def _register_flows(self):
+        initializers = self._get_layer_initializers()
+        init_flow = register_flow('init_layers', initializers, requires=['optimize'], backend=self.name)
+
         validation_passes = [
             'vitis:validate_conv_implementation',
             'vitis:validate_strategy',
         ]
-        validation_flow = register_flow('validation', validation_passes, requires=['vivado:init_layers'], backend=self.name)
+        validation_flow = register_flow('validation', validation_passes, requires=['vitis:init_layers'], backend=self.name)
+
+        streaming_passes = [
+            'vitis:reshape_stream',
+            'vitis:clone_output',
+            'vitis:insert_zero_padding_before_conv1d',
+            'vitis:insert_zero_padding_before_conv2d',
+            'vitis:broadcast_stream',
+        ]
+        streaming_flow = register_flow('streaming', streaming_passes, requires=[init_flow], backend=self.name)
+
+        quantization_passes = [
+            'vitis:merge_batch_norm_quantized_tanh',
+            'vitis:quantize_dense_output',
+            'fuse_consecutive_batch_normalization',
+        ]
+        quantization_flow = register_flow('quantization', quantization_passes, requires=[init_flow], backend=self.name)
+
+        optimization_passes = ['vitis:remove_final_reshape', 'vitis:optimize_pointwise_conv', 'vitis:skip_softmax']
+        optimization_flow = register_flow('optimize', optimization_passes, requires=[init_flow], backend=self.name)
+
+        vivado_types = [
+            'vitis:transform_types',
+            'vitis:register_bram_weights',
+            'vitis:generate_conv_streaming_instructions',
+            'vitis:apply_resource_strategy',
+            'vitis:generate_conv_im2col',
+        ]
+        vivado_types_flow = register_flow('specific_types', vivado_types, requires=[init_flow], backend=self.name)
+
+        templates = self._get_layer_templates()
+        template_flow = register_flow('apply_templates', self._get_layer_templates, requires=[init_flow], backend=self.name)
 
         writer_passes = ['make_stamp', 'vitis:write_hls']
         self._writer_flow = register_flow('write', writer_passes, requires=['vitis:ip'], backend=self.name)
 
-        ip_flow_requirements = get_flow('vivado:ip').requires.copy()
-        ip_flow_requirements.insert(ip_flow_requirements.index('vivado:init_layers'), validation_flow)
+        fifo_depth_opt_passes = [
+            'vitis:fifo_depth_optimization'
+        ] + writer_passes  # After optimization, a new project will be written
+
+        register_flow('fifo_depth_optimization', fifo_depth_opt_passes, requires=[self._writer_flow], backend=self.name)
+
+        all_passes = get_backend_passes(self.name)
+
+        extras = [
+            # Ideally this should be empty
+            opt_pass
+            for opt_pass in all_passes
+            if opt_pass
+            not in initializers
+            + streaming_passes
+            + quantization_passes
+            + optimization_passes
+            + vivado_types
+            + templates
+            + writer_passes
+            + fifo_depth_opt_passes
+        ]
+
+        if len(extras) > 0:
+            extras_flow = register_flow('extras', extras, requires=[init_flow], backend=self.name)
+        else:
+            extras_flow = None
+
+        ip_flow_requirements = [
+            'optimize',
+            init_flow,
+            validation_flow,
+            streaming_flow,
+            quantization_flow,
+            optimization_flow,
+            vivado_types_flow,
+            extras_flow,
+            template_flow,
+        ]
+        ip_flow_requirements = list(filter(None, ip_flow_requirements))
 
         self._default_flow = register_flow('ip', None, requires=ip_flow_requirements, backend=self.name)
 

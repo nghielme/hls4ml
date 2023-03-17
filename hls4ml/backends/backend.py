@@ -26,7 +26,11 @@ class Backend(object):
 
     def _init_file_optimizers(self):
         file_optimizers = {}
-        for cls in [*self.__class__.__bases__, self.__class__]:
+
+        for cls in inspect.getmro(self.__class__):
+            if cls is Backend:
+                # stop traversing subclasses when you get to Backend
+                break
             opt_path = os.path.dirname(inspect.getfile(cls)) + '/passes'
             module_path = cls.__module__[:cls.__module__.rfind('.')] + '.passes'
             cls_optimizers = extract_optimizers_from_path(opt_path, module_path, self)

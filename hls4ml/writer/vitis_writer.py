@@ -1,9 +1,10 @@
 import os
 import glob
 from shutil import copy
-from hls4ml.writer.vivado_writer import VivadoWriter
+from hls4ml.writer.xilinx_writer import XilinxWriter
 
-class VitisWriter(VivadoWriter):
+
+class VitisWriter(XilinxWriter):
 
     def __init__(self):
         super().__init__()
@@ -15,7 +16,7 @@ class VitisWriter(VivadoWriter):
 
         filedir = os.path.dirname(os.path.abspath(__file__))
 
-        srcpath = os.path.join(filedir,'../templates/vitis/nnet_utils/')
+        srcpath = os.path.join(filedir, '../templates/vitis/nnet_utils/')
         dstpath = '{}/firmware/nnet_utils/'.format(model.config.get_output_dir())
 
         headers = [os.path.basename(h) for h in glob.glob(srcpath + '*.h')]
@@ -27,5 +28,5 @@ class VitisWriter(VivadoWriter):
         """
         Write the HLS project. Calls the steps from VivadoWriter, adapted for Vitis
         """
-        super(VitisWriter, self).write_hls(model)
+        super().write_hls(model)
         self.write_nnet_utils_overrides(model)

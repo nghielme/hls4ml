@@ -1,4 +1,4 @@
-from hls4ml.backends.vivado.passes.fifo_depth_optimization import set_big_fifos, get_vcd_data, populate_values, \
+from hls4ml.backends.xilinx.passes.fifo_depth_optimization import set_big_fifos, get_vcd_data, populate_values, \
     generate_max_depth_file, set_fifo_depth
 from hls4ml.model.optimizer.optimizer import ConfigurableOptimizerPass, ModelOptimizerPass
 
