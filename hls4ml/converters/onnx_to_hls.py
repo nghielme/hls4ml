@@ -28,18 +28,12 @@ class ONNXDataReader:
     def get_weights_data(self, layer_name, var_name):
         """Extract weights data from ONNX model.
 
-        Parameters
-        ----------
-        layer_name : string
-            layer's name in the ONNX model
-        var_name : string
-            variable to be extracted
+        Args:
+            layer_name (str): Layer's name in the ONNX model.
+            var_name (str): Variable to be extracted.
 
-        Returns
-        -------
-        data : numpy array
-            extracted weights data
-
+        Returns:
+            ndarray: Extracted weights data.
         """
         # Get the node associated with the layer name
         node = next(node for node in self.model.graph.node if node.name == layer_name)
@@ -58,7 +52,6 @@ class ONNXDataReader:
         tensor = next((x for x in self.model.graph.initializer if x.name == inputs['inputs'][inp_idx]), None)
 
         if tensor is not None:
-
             data = numpy_helper.to_array(tensor)
 
             if inputs['transpose']:
@@ -148,6 +141,7 @@ def get_constant_value(graph, constant_name):
     return numpy_helper.to_array(tensor)
 
 
+
 def compute_pads_1d(operation, layer):
     auto_pad = get_onnx_attribute(operation, 'auto_pad', 'NOTSET')
     if auto_pad != 'NOTSET':
@@ -220,6 +214,7 @@ def onnx_handler(*args):
         return function
 
     return decorator
+
 
 
 def get_out_layer_name(graph):

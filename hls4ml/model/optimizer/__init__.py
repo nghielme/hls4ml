@@ -84,3 +84,29 @@ except ImportError:
 del opt_path
 del module_path
 del optimizers
+
+register_flow(
+    'convert',
+    [
+        'channels_last_converter',
+        'fuse_bias_add',
+        'remove_useless_transpose',
+        'expand_layer_group',
+        'output_rounding_saturation_mode',
+        'qkeras_factorize_alpha',
+        'extract_ternary_threshold',
+        'fuse_consecutive_batch_normalization',
+    ],
+)  # TODO Maybe not all QKeras optmizers belong here?
+
+register_flow(
+    'optimize',
+    [
+        'eliminate_linear_activation',
+        'fuse_consecutive_batch_normalization',
+        'fuse_batch_normalization',
+        'replace_multidimensional_dense_with_conv',
+        'set_precision_concat',
+    ],
+    requires=['convert'],
+)

@@ -1,5 +1,3 @@
-import numpy as np
-
 from hls4ml.model.layers import BatchNormalization, Conv1D, Conv2D, Dense
 from hls4ml.model.optimizer import OptimizerPass
 
