@@ -5,7 +5,6 @@ from hls4ml.converters.onnx_to_hls import get_onnx_attribute, onnx_handler
 
 @onnx_handler('MatMul')
 def parse_matmul_layer(reader, node, inputs_map, input_shapes, graph, config):
-
     layer = {}
 
     layer['class_name'] = 'MatMul'
@@ -53,7 +52,6 @@ activation_map = {
 
 @onnx_handler(*activation_layers)
 def parse_activation_layer(reader, node, inputs_map, input_shapes, graph, config):
-
     layer = {}
 
     layer['name'] = node.name
@@ -63,7 +61,6 @@ def parse_activation_layer(reader, node, inputs_map, input_shapes, graph, config
     layer['outputs'] = node.output
 
     if layer['class_name'] != 'Activation':
-
         if layer['class_name'] == 'Softmax':
             layer['activation'] = 'softmax'
             layer['axis'] = get_onnx_attribute(node, 'axis', -1)
@@ -73,7 +70,6 @@ def parse_activation_layer(reader, node, inputs_map, input_shapes, graph, config
             layer['activ_param'] = get_onnx_attribute(node, 'alpha', 0.01)
 
         elif layer['class_name'] == 'Clip':
-
             clip_min_node = [x for x in graph.initializer if x.name in node.input]
             clip_min = clip_min_node[0].float_data[0]
 
@@ -93,7 +89,6 @@ def parse_activation_layer(reader, node, inputs_map, input_shapes, graph, config
 
 @onnx_handler('BatchNormalization')
 def parse_batchnorm_layer(reader, node, inputs_map, input_shapes, graph, config):
-
     layer = {}
 
     layer['class_name'] = 'BatchNormOnnx'
@@ -122,7 +117,6 @@ def parse_batchnorm_layer(reader, node, inputs_map, input_shapes, graph, config)
 
 @onnx_handler('Quant')
 def parse_quant_layer(reader, node, inputs_map, input_shapes, graph, config):
-
     layer = {}
 
     layer['class_name'] = 'Quant'

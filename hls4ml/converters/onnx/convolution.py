@@ -3,7 +3,6 @@ import numpy as np
 from hls4ml.converters.onnx_to_hls import get_onnx_attribute, onnx_handler
 
 
-
 @onnx_handler('Conv')
 def parse_conv_layer(reader, node, inputs_map, input_shapes, graph, config):
     layer = {}

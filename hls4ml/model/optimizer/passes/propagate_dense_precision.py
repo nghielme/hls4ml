@@ -18,7 +18,6 @@ class PropagateDensePrecision(OptimizerPass):
         return is_match
 
     def transform(self, model, node):
-
         input_precision = node.get_input_node().get_attr("quant_precision")
         weight_precision = node.get_attr("weight_precision")
         if not input_precision or not weight_precision:

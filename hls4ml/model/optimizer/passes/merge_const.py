@@ -85,7 +85,6 @@ class MergeToBatchNormalization(OptimizerPass):
         return is_match
 
     def transform(self, model, node):
-
         node1 = node.get_input_node(node.inputs[1])
 
         node1const = isinstance(node1, Constant)

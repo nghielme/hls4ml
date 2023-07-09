@@ -7,7 +7,6 @@ pool_operations = ['AveragePool', 'MaxPool']
 
 @onnx_handler(*pool_operations)
 def parse_pool_layer(reader, node, inputs_map, input_shapes, graph, config):
-
     layer = {}
     layer['name'] = node.name
     layer['inputs'] = node.input
@@ -67,7 +66,6 @@ def parse_pool_layer(reader, node, inputs_map, input_shapes, graph, config):
         )
 
     return layer
-
 
 
 global_pooling_layers = ['GlobalMaxPool', 'GlobalAveragePool']

@@ -120,7 +120,6 @@ class ScaleDownAdd(OptimizerPass):
         return is_match
 
     def transform(self, model, node):
-
         in0 = node.get_input_node(node.inputs[0])
         in1 = node.get_input_node(node.inputs[1])
 
@@ -153,7 +152,6 @@ class ScaleDownConv(OptimizerPass):
         return is_match
 
     def transform(self, model, node):
-
         apply_alpha = node.get_input_node(node.inputs[0])
 
         # Check if we can move
@@ -208,7 +206,6 @@ class ScaleDownWeightConv(OptimizerPass):
         return is_match
 
     def transform(self, model, node):
-
         apply_alpha = node.get_input_node(node.inputs[1])
 
         # Check if we can move
@@ -263,7 +260,6 @@ class ScaleDownBiasConv(OptimizerPass):
         return is_match
 
     def transform(self, model, node):
-
         apply_alpha = node.get_input_node(node.inputs[2])
 
         # Check if we can move

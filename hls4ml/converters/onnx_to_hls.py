@@ -141,7 +141,6 @@ def get_constant_value(graph, constant_name):
     return numpy_helper.to_array(tensor)
 
 
-
 def compute_pads_1d(operation, layer):
     auto_pad = get_onnx_attribute(operation, 'auto_pad', 'NOTSET')
     if auto_pad != 'NOTSET':
@@ -214,7 +213,6 @@ def onnx_handler(*args):
         return function
 
     return decorator
-
 
 
 def get_out_layer_name(graph):
@@ -299,7 +297,6 @@ def onnx_to_hls(config):
 
     print('Topology:')
     for node in model.graph.node:
-
         if node.op_type not in supported_layers:
             raise Exception(f'ERROR: Unsupported operation type: {node.op_type}')
 

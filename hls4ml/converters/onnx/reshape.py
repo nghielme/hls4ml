@@ -1,12 +1,8 @@
 from hls4ml.converters.onnx_to_hls import onnx_handler
 
 
-from hls4ml.converters.onnx_to_hls import get_onnx_input_name, onnx_handler
-
-
 @onnx_handler('Transpose')
 def parse_transpose_layer(reader, node, inputs_map, input_shapes, graph, config):
-
     layer = {}
     layer['name'] = node.name
     layer['class_name'] = 'Transpose'
@@ -17,7 +13,6 @@ def parse_transpose_layer(reader, node, inputs_map, input_shapes, graph, config)
     layer['perm'] = [x - 1 for x in perm[1:]]  # Ignore the batch dimension in ONNX, and adjust the perm indexing
 
     return layer
-
 
 
 @onnx_handler('Reshape')
@@ -33,7 +28,6 @@ def parse_reshape_layer(reader, node, inputs_map, input_shapes, graph, config):
 
 @onnx_handler('Flatten')
 def parse_flatten_layer(reader, node, inputs_map, input_shapes, graph, config):
-
     layer = {}
     layer['name'] = node.name
     layer['class_name'] = 'Reshape'
