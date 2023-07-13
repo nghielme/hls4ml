@@ -249,6 +249,7 @@ class Layer:
 
         self.set_attr(out_name, out)
 
+    # Maybe try to remove this
     def update_output_precision(self, precision, output_name=None):
         if output_name is None:
             output_name = self.outputs[0]
@@ -338,7 +339,7 @@ class Input(Layer):
     def initialize(self):
         shape = self.attributes['input_shape']
         if shape[0] is None:
-            shape = shape[1:]
+            raise RuntimeError(f"Unexpectedly have a None in {shape=} of Input layer")
         dims = [f'N_INPUT_{i}_{self.index}' for i in range(1, len(shape) + 1)]
         if self.index == 1:
             default_type_name = 'input_t'
@@ -391,20 +392,20 @@ class Reshape(Layer):
 
     def initialize(self):
         input_shape = self.get_input_variable(self.inputs[0]).shape
-        target_shape = self.get_attr('target_shape')
+        target_shape = self.get_attr('target_shape')  # this should not have a batch dimension
         if target_shape is None:
             # need to get it from the input
             shape_node = self.get_input_node(self.inputs[1])
             # for QONNX, remove batch dimension
+            # (onnx cleaning should have removed reshape dimension)
             if shape_node:
                 target_shape = shape_node.value[1:]
             else:
                 raise RuntimeError("Reshape for ONNX requires the target shape to be a second input.")
 
-        # remove Nones or leading ones
-        if target_shape[0] is None or (len(target_shape) > 1 and target_shape[0] == 1):
-            # the latter case is for QONNX
-            target_shape = target_shape[1:]
+        # nones should not exist here
+        if target_shape[0] is None:
+            raise RuntimeError(f"Unexpectedly have a None in {target_shape=}")
 
         # take care of -1 shapes
         shape = self._infer_output_shape(input_shape, target_shape)
