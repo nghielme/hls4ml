@@ -293,7 +293,7 @@ def parse_keras_model(model_arch, reader):
             )
         )
         layer_list.append(layer)
-        if 'activation' in layer and layer['class_name'] not in activation_layers + recurrent_layers:  # + qkeras_layers:
+        if layer.get('activation') and layer['class_name'] not in activation_layers + recurrent_layers:  # + qkeras_layers:
             act_layer = {}
             # Workaround for QKeras activations passed as an argument
             if isinstance(layer['activation'], dict):

@@ -655,6 +655,8 @@ class Pooling1D(Layer):
             dims = [f'N_FILT_{self.index}', f'N_OUTPUTS_{self.index}']
         self.add_output_variable(shape, dims)
         self.set_attr('pool_op', self.get_attr('class_name').split('Pooling')[0])
+        if self.attributes['pool_op'][0] == 'Q':
+            self.set_attr('pool_op', self.attributes['pool_op'][1:])
 
 
 class Pooling2D(Layer):
@@ -685,6 +687,8 @@ class Pooling2D(Layer):
             dims = [f'N_FILT_{self.index}', f'OUT_HEIGHT_{self.index}', f'OUT_WIDTH_{self.index}']
         self.add_output_variable(shape, dims)
         self.set_attr('pool_op', self.get_attr('class_name').split('Pooling')[0])
+        if self.attributes['pool_op'][0] == 'Q':
+            self.set_attr('pool_op', self.attributes['pool_op'][1:])
 
 
 class GlobalPooling1D(Layer):
@@ -1354,6 +1358,7 @@ layer_map = {
     'AveragePooling1D': Pooling1D,
     'MaxPooling2D': Pooling2D,
     'AveragePooling2D': Pooling2D,
+    'QAveragePooling2D': Pooling2D,
     'GlobalMaxPooling1D': GlobalPooling1D,
     'GlobalAveragePooling1D': GlobalPooling1D,
     'GlobalMaxPooling2D': GlobalPooling2D,
