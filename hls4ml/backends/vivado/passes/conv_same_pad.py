@@ -1,4 +1,4 @@
-from hls4ml.model.layers import Conv1D, Conv2D, DepthwiseConv2D, DepthwiseConv1D, SeparableConv1D, SeparableConv2D
+from hls4ml.model.layers import Conv1D, Conv2D, DepthwiseConv1D, DepthwiseConv2D, SeparableConv1D, SeparableConv2D
 from hls4ml.model.optimizer import OptimizerPass
 
 

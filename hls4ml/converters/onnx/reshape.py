@@ -1,5 +1,6 @@
-from hls4ml.converters.onnx_to_hls import get_onnx_attribute, onnx_handler
 import struct
+
+from hls4ml.converters.onnx_to_hls import get_onnx_attribute, onnx_handler
 
 
 @onnx_handler('Transpose')
@@ -37,6 +38,7 @@ def parse_flatten_layer(node, input_names, input_shapes, graph):
     layer['target_shape'] = [-1]  # does not contain batch dimension
 
     return layer
+
 
 @onnx_handler('Resize')
 def parse_resize_layer(node, input_names, input_shapes, graph):

@@ -30,10 +30,8 @@ class ConvToDepthwiseConvXD(OptimizerPass):
 
     def match(self, node):
         is_match = (
-            isinstance(node, Conv) 
-            and node.get_attr('group') == node.get_attr('n_chan') 
-            and  node.get_attr('group') != 1
-            ) and (
+            isinstance(node, Conv) and node.get_attr('group') == node.get_attr('n_chan') and node.get_attr('group') != 1
+        ) and (
             (len(node.inputs) == 2 and isinstance(node.get_input_node(node.inputs[1]), Constant))
             or (
                 len(node.inputs) == 3
