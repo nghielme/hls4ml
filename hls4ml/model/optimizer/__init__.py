@@ -34,6 +34,7 @@ register_flow(
     'convert',
     [
         'reshape_constant',
+        'resize_constant',
         'quant_constant_parameters',
         'quant_to_activation',
         'fuse_quant_with_constant',
@@ -51,6 +52,7 @@ register_flow(
         'merge_to_apply_alpha_div',
         'matmul_const_to_dense',
         'conv_to_conv_x_d',
+        'conv_to_depthwise_conv_x_d',
         'fuse_consecutive_batch_normalization',  # needs to be before infer_precision_types
         'merge_linear_activation',  # needs to be before infer_precision_types
         'fuse_batch_normalization',  # needs to be before infer_precision_types
