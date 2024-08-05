@@ -356,6 +356,8 @@ def _calculate_precision_quantizer(bitwidth, integer, signed, narrow, rounding_m
     """
     A function to determine the precision and quantizer
     """
+    if isinstance(integer, np.ndarray) and np.all(integer == integer[0]):
+        integer = integer[0]
     if rounding_mode == 'ROUND':
         bn_round = 'AP_RND_CONV'
     elif rounding_mode == 'FLOOR':

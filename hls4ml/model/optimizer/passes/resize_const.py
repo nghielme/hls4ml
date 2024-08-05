@@ -20,10 +20,10 @@ class ResizeConstant(OptimizerPass):
         """
         Remove Constant from new shape input. Note, input shape node is already used on initialize
         """
-        shape_node = node.get_input_node(node.inputs[-1])
+        scales_node = node.get_input_node(node.inputs[-1])
         node.inputs[-1] = ''
-        if not isinstance(shape_node, Constant):
+        if not isinstance(scales_node, Constant):
             raise RuntimeError("Nonconstant shape inputs are not currently supported")
-        model.remove_node(shape_node, rewire=False)
+        model.remove_node(scales_node, rewire=False)
 
         return True

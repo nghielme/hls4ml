@@ -8,6 +8,8 @@ class InsertZeroPaddingBeforeConv1D(OptimizerPass):
     def match(self, node):
         is_match = (
             isinstance(node, (Conv1D, SeparableConv1D, DepthwiseConv1D))
+            and ((node.get_attr('pad_left') == node.get_attr('pad_right')) 
+                 or (node.get_attr('pad_left') > 0 and node.get_attr('pad_right') == 0)) # checking if it is padding same or causal
             and ((node.get_attr('padding') == 'same') or (node.get_attr('padding') == 'causal'))
             and node.get_attr('filt_width') != 1
         )
@@ -56,7 +58,7 @@ class InsertZeroPaddingBeforeConv2D(OptimizerPass):
     def match(self, node):
         is_match = (
             isinstance(node, (Conv2D, SeparableConv2D, DepthwiseConv2D))
-            # and node.get_attr('padding') == 'same'
+            and node.get_attr('pad_top') == node.get_attr('pad_bottom') and node.get_attr('pad_left') == node.get_attr('pad_right') # checking if it is padding same
             and node.get_attr('filt_height') != 1
             and node.get_attr('filt_width') != 1
         )
