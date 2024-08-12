@@ -22,6 +22,9 @@ class ResizeConstant(OptimizerPass):
         """
         scales_node = node.get_input_node(node.inputs[-1])
         node.inputs[-1] = ''
+        scales_values = scales_node.get_attr('value')
+        node.set_attr('out_width', int(node.get_attr('in_width') * scales_values[1]))
+        node.set_attr('out_height', int(node.get_attr('in_height') * scales_values[2]))
         if not isinstance(scales_node, Constant):
             raise RuntimeError("Nonconstant shape inputs are not currently supported")
         model.remove_node(scales_node, rewire=False)
