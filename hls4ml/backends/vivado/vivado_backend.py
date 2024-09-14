@@ -105,6 +105,7 @@ class VivadoBackend(FPGABackend):
             'vivado:fix_softmax_table_size',
             'vivado:process_fixed_point_quantizer_layer',
             'infer_precision_types',
+            'vivado:match_quantizer_resize'
         ]
         optimization_flow = register_flow('optimize', optimization_passes, requires=[init_flow], backend=self.name)
 

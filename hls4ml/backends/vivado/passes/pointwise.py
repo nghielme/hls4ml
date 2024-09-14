@@ -75,8 +75,7 @@ class OptimizePointwiseConv(OptimizerPass):
 
     def transform(self, model, node):
         dim = node.__class__.__name__[-2:]  # '1D' or '2D'
-        pw_node = model.make_node('PointwiseConv' + dim, node.name, copy(node.attributes), node.inputs.copy())
-        pw_node.weights['bias'].data = node.weights['bias'].data
+        pw_node = model.make_node('PointwiseConv' + dim, node.name, copy(node.attributes), node.inputs.copy(), [x for x in node.outputs])
         # Set strategy to ensure lowercase string is passed to the template
         if model.config.is_resource_strategy(pw_node):
             pw_node.set_attr('strategy', 'resource')
