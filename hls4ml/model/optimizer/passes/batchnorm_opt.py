@@ -98,7 +98,9 @@ class ConstantBatchNormFusion(OptimizerPass):
 
         const_prec = const_node.get_output_variable().type.precision
 
-        new_val = const_node.value * node.weights['scale'].data_unquantized + node.weights['bias'].data_unquantized
+        new_val = (
+            const_node.get_attr('value') * node.weights['scale'].data_unquantized + node.weights['bias'].data_unquantized
+        )
 
         const_node.set_attr('value', new_val)
         const_node.set_attr('quantizer', node.get_attr('quantizer'))  # None if not defined
