@@ -1,4 +1,4 @@
-from hls4ml.model.layers import Conv1D, Conv2D, SeparableConv1D, SeparableConv2D
+from hls4ml.model.layers import Conv1D, Conv2D, DepthwiseConv1D, DepthwiseConv2D, SeparableConv1D, SeparableConv2D
 from hls4ml.model.optimizer import OptimizerPass
 
 
@@ -7,7 +7,7 @@ class InsertZeroPaddingBeforeConv1D(OptimizerPass):
 
     def match(self, node):
         is_match = (
-            isinstance(node, (Conv1D, SeparableConv1D))
+            isinstance(node, (Conv1D, SeparableConv1D, DepthwiseConv1D))
             and ((node.get_attr('padding') == 'same') or (node.get_attr('padding') == 'causal'))
             and node.get_attr('filt_width') != 1
         )
@@ -54,11 +54,11 @@ class InsertZeroPaddingBeforeConv2D(OptimizerPass):
     name = 'insert_zero_padding_before_conv2d'
 
     def match(self, node):
-        is_match = (
-            isinstance(node, (Conv2D, SeparableConv2D))
-            and node.get_attr('padding') == 'same'
-            and node.get_attr('filt_height') != 1
-            and node.get_attr('filt_width') != 1
+        is_match = isinstance(node, (Conv2D, DepthwiseConv2D, SeparableConv2D)) and (
+            (node.get_attr('pad_left') != 0)
+            or (node.get_attr('pad_right') != 0)
+            or (node.get_attr('pad_top') != 0)
+            or (node.get_attr('pad_bottom') != 0)
         )
         return is_match
 
@@ -93,7 +93,6 @@ class InsertZeroPaddingBeforeConv2D(OptimizerPass):
         }
 
         # Switch Conv2D layer padding to 'valid'
-        node.set_attr('padding', 'valid')
         node.set_attr('pad_top', 0)
         node.set_attr('pad_bottom', 0)
         node.set_attr('pad_left', 0)
