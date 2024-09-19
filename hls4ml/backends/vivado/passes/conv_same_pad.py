@@ -6,10 +6,8 @@ class InsertZeroPaddingBeforeConv1D(OptimizerPass):
     name = 'insert_zero_padding_before_conv1d'
 
     def match(self, node):
-        is_match = (
-            isinstance(node, (Conv1D, SeparableConv1D, DepthwiseConv1D))
-            and ((node.get_attr('padding') == 'same') or (node.get_attr('padding') == 'causal'))
-            and node.get_attr('filt_width') != 1
+        is_match = isinstance(node, (Conv1D, SeparableConv1D, DepthwiseConv1D)) and (
+            (node.get_attr('pad_left') != 0) or (node.get_attr('pad_right') != 0)
         )
         return is_match
 
@@ -37,7 +35,6 @@ class InsertZeroPaddingBeforeConv1D(OptimizerPass):
         }
 
         # Switch Conv1D layer padding to 'valid'
-        node.set_attr('padding', 'valid')
         node.set_attr('pad_left', 0)
         node.set_attr('pad_right', 0)
         node.set_attr('in_width', out_width)
@@ -55,9 +52,9 @@ class InsertZeroPaddingBeforeConv2D(OptimizerPass):
 
     def match(self, node):
         is_match = isinstance(node, (Conv2D, DepthwiseConv2D, SeparableConv2D)) and (
-            (node.get_attr('pad_left') != 0) 
-            or (node.get_attr('pad_right') != 0) 
-            or (node.get_attr('pad_top') != 0) 
+            (node.get_attr('pad_left') != 0)
+            or (node.get_attr('pad_right') != 0)
+            or (node.get_attr('pad_top') != 0)
             or (node.get_attr('pad_bottom') != 0)
         )
         return is_match
