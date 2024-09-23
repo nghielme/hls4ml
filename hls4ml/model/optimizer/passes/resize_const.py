@@ -18,7 +18,11 @@ class ResizeConstant(OptimizerPass):
         Remove Constant from new shape input. Note, input shape node is already used on initialize
         """
         scales_node = node.get_input_node(node.inputs[-1])
-        node.inputs[-1] = ''
+        roi_node = node.get_input_node(node.inputs[1])
+        if scales_node is not None: 
+            node.inputs[-1] = ''
+        if roi_node is not None:
+            node.inputs[1] = '' 
         scales_values = scales_node.get_attr('value')
         node.set_attr('out_width', int(node.get_attr('in_width') * scales_values[1]))
         node.set_attr('out_height', int(node.get_attr('in_height') * scales_values[2]))
