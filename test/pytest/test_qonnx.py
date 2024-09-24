@@ -18,25 +18,18 @@ import hls4ml.converters
 
 
 test_root_path = Path(__file__).parent
+example_model_path = (test_root_path / '../../example-models').resolve()
+
 
 @pytest.fixture(scope='module')
 def sep_conv_model():
     """
-    Load separabale conv model
+    Load separabale conv model, already channels-last and cleaned
     """
-    dl_dir = test_root_path
-    dl_file = str(dl_dir / "qonnx-sep-conv-ch-last.onnx")
-    sep_conv_qonnx_url = (
-        "https://raw.githubusercontent.com/fastmachinelearning"
-        "/example-models/qonnx-new-models/onnx/branched_model_ch_last.onnx"
-    )
-    urllib.request.urlretrieve(sep_conv_qonnx_url, dl_file)
+    dl_file = str(example_model_path / "onnx/separable_conv_model_ch_last.onnx")
     assert os.path.isfile(dl_file)
-    out_file = str(dl_dir / "qonnx-sep-conv-ch-last-clean.onnx")
-    
-    # cleanup
-    qonnx.util.cleanup.cleanup(dl_file, out_file=out_file)
-    model = ModelWrapper(out_file)
+
+    model = ModelWrapper(dl_file)
 
     return model
 
@@ -129,6 +122,33 @@ def test_sep_conv(sep_conv_model, backend):
 
     np.testing.assert_allclose(y_qonnx.ravel(), y_hls4ml.ravel(), atol=1e-2, rtol=1)
     print('test')
+
+@pytest.mark.parametrize('backend', ['Vitis'])
+def test_sep_conv(sep_conv_model, backend):
+    model = sep_conv_model
+    ishape = tuple(model.get_tensor_shape(model.graph.input[0].name))
+    X = np.random.uniform(low=0, high=1, size=np.prod(ishape)).reshape(ishape)
+    # X = (np.round(X * 2**16) * 2**-16).astype(np.float32)
+    idict = {model.graph.input[0].name: X}
+    y_qonnx = oxe.execute_onnx(model, idict)[model.graph.output[0].name]
+
+    config = hls4ml.utils.config.config_from_onnx_model(
+        model, granularity='name', backend=backend, default_precision='fixed<16,6>'
+    )
+
+    hls_model = hls4ml.converters.convert_from_onnx_model(
+        model,
+        output_dir=str(test_root_path / f'hls4mlprj_qonnx_sep_conv_{backend}'),
+        io_type='io_stream',
+        backend=backend,
+        hls_config=config,
+    )
+    hls_model.compile()
+    y_hls4ml = hls_model.predict(np.ascontiguousarray(X))
+
+    np.testing.assert_allclose(y_qonnx.ravel(), y_hls4ml.ravel(), atol=1e-2, rtol=1)
+    print('test')
+
 
 @pytest.mark.parametrize('backend', ['Vivado', 'Vitis', 'Quartus'])
 def test_tfc_2w2a(tfc_2w2a_model, backend):
