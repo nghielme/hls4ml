@@ -6,7 +6,7 @@
 namespace nnet {
 
 template <class res_T, typename CONFIG_T> void fill_zero(hls::stream<res_T> &res) {
-    #pragma HLS INLINE
+    #pragma HLS inline
     res_T res_part;
     #pragma clang loop unroll(full)
     for (int c = 0; c < CONFIG_T::n_chan; c++) {
@@ -17,7 +17,7 @@ template <class res_T, typename CONFIG_T> void fill_zero(hls::stream<res_T> &res
 }
 
 template <class data_T, class res_T, typename CONFIG_T> void fill_data(hls::stream<data_T> &data, hls::stream<res_T> &res) {
-    #pragma HLS INLINE
+    #pragma HLS inline
     data_T data_part = data.read();
     res_T res_part;
     #pragma clang loop unroll(full)

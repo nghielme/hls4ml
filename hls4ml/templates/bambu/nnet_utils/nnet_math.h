@@ -39,7 +39,7 @@ template <class T, int W, int I> void init_sincos_table(T table[1 << (W - I - 3)
 
 template <class T> void sincos_lut(const T &input, T output[2]) {
 
-    #pragma HLS INLINE
+    #pragma HLS inline
 
     // This implementation is based on ac_sincos_lut.h from AC math library
 
@@ -158,7 +158,7 @@ template <class T> void sincos_lut(const T &input, T output[2]) {
 }
 
 template <class T> T sin_lut(const T input) {
-    #pragma HLS INLINE
+    #pragma HLS inline
     T sincos_res[2];
     T scaled_input = input * ap_ufixed<16, 0>(0.15915494309); // 1/(2*pi)
     sincos_lut(scaled_input, sincos_res);
@@ -166,7 +166,7 @@ template <class T> T sin_lut(const T input) {
 }
 
 template <class T> T cos_lut(const T input) {
-    #pragma HLS INLINE
+    #pragma HLS inline
     T sincos_res[2];
     T scaled_input = input * ap_ufixed<16, 0>(0.15915494309); // 1/(2*pi)
     sincos_lut(scaled_input, sincos_res);

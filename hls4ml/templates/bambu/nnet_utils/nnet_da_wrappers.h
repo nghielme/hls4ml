@@ -56,7 +56,7 @@ conv1d_cl(data_T data[CONFIG_T::in_width * CONFIG_T::n_chan], res_T res[CONFIG_T
 
     data_T data_buf[CONFIG_T::n_pixels][mult_n_in];
     //#pragma HLS ARRAY_PARTITION variable = data_buf complete dim = 0
-    #pragma HLS INLINE
+    #pragma HLS inline
 
     res_T out_buf[mult_n_out];
 
@@ -93,7 +93,7 @@ conv2d_cl(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_T::n_cha
 
     data_T data_buf[CONFIG_T::n_pixels][mult_n_in];
     //#pragma HLS ARRAY_PARTITION variable=data_buf complete dim = 0
-    #pragma HLS INLINE
+    #pragma HLS inline
 
     res_T out_buf[mult_n_out];
 

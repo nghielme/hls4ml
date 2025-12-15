@@ -15,7 +15,7 @@ namespace nnet {
 // *************************************************
 
 template <class T, int N, class CONFIG_T> T reduce_pool(T x[N]) {
-    #pragma HLS INLINE
+    #pragma HLS inline
     if (CONFIG_T::pool_op == Max) {
         Op_max<T> op_max;
         return reduce<T, N, Op_max<T>>(x, op_max);
@@ -66,7 +66,7 @@ void compute_pool_encoded_2d(
         initialized = true;
     }
 
-    #pragma HLS INLINE
+    #pragma HLS inline
 
     if (data_T::size / CONFIG_T::n_filt > 1) {
         //#pragma HLS ARRAY_PARTITION variable=pool_table_height complete
@@ -167,7 +167,7 @@ void compute_pool_buffer_2d(const data_T &in_elem,
                             ap_shift_reg<typename data_T::value_type, CONFIG_T::in_width>
                                 line_buffer[MAX(CONFIG_T::pool_height - 1, 1)][CONFIG_T::n_filt],
                             hls::stream<res_T> &res) {
-    #pragma HLS INLINE
+    #pragma HLS inline
     const static int lShiftX = CONFIG_T::pool_width - 1;
     const static int lShiftY = CONFIG_T::pool_height - 1;
     static int pX = 0; // pixel X
@@ -289,7 +289,7 @@ void compute_pool_encoded_1d(const unsigned w_idx, const data_T &in_elem,
         initialized = true;
     }
 
-    #pragma HLS INLINE
+    #pragma HLS inline
 
     if (data_T::size / CONFIG_T::n_filt > 1) {
         //#pragma HLS ARRAY_PARTITION variable=pool_table_width complete
@@ -377,7 +377,7 @@ ReadInputWidth:
 // *************************************************
 template <class data_T, class res_T, typename CONFIG_T>
 void compute_pool_buffer_1d(const data_T &in_elem, hls::stream<res_T> &res) {
-    #pragma HLS INLINE
+    #pragma HLS inline
     const static int lShiftX = CONFIG_T::pool_width - 1;
     // Counters
     static int pX = 0;
@@ -458,7 +458,7 @@ void pooling1d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res) {
 // *************************************************
 
 template <class T, int N, class CONFIG_T> T reduce_global_pool(T x, T y[N]) {
-    #pragma HLS INLINE
+    #pragma HLS inline
     if (CONFIG_T::pool_op == Max) {
         Op_max<T> op_max;
         T y_max = reduce<T, N, Op_max<T>>(y, op_max);

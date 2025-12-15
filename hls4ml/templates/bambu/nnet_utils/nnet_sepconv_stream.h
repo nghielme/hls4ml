@@ -13,7 +13,7 @@ void depthwise_mult_buffer(hls::stream<typename data_T::value_type> data_window[
                            res_T &res_pack, hls::stream<res_T> &res_stream, unsigned &outputs_ready,
                            typename CONFIG_T::weight_t weights[CONFIG_T::kernel_size * CONFIG_T::n_chan],
                            typename CONFIG_T::bias_t biases[CONFIG_T::n_chan]) {
-    #pragma HLS INLINE
+    #pragma HLS inline
 
     typename data_T::value_type data[CONFIG_T::kernel_size * CONFIG_T::n_chan];
     //#pragma HLS ARRAY_PARTITION variable=data complete
@@ -27,7 +27,7 @@ InitData:
         data[id] = data_window[id].read();
     }
 
-    #pragma HLS INLINE recursive
+    #pragma HLS inline recursive
     CONFIG_T::mult_config::template kernel<typename data_T::value_type, typename res_T::value_type,
                                            typename CONFIG_T::mult_config>::dense(data, res, weights, biases);
 
@@ -60,7 +60,7 @@ void compute_depthwise_output_encoded(
     hls::stream<res_T> &res, res_T &res_pack, unsigned &outputs_ready,
     typename CONFIG_T::weight_t weights[CONFIG_T::kernel_size * CONFIG_T::n_chan],
     typename CONFIG_T::bias_t biases[CONFIG_T::n_chan], ap_uint<CONFIG_T::kernel_size> *pixel_idx) {
-    #pragma HLS INLINE
+    #pragma HLS inline
 
 MultLoop:
     for (unsigned p = 0; p < data_T::size / CONFIG_T::n_chan; p++) {
@@ -87,7 +87,7 @@ template <class data_T, class res_T, typename CONFIG_T>
 void pointwise_mult_buffer(const data_T &data_pack, hls::stream<res_T> &res_stream,
                            typename CONFIG_T::weight_t weights[CONFIG_T::n_chan * CONFIG_T::n_filt],
                            typename CONFIG_T::bias_t biases[CONFIG_T::n_filt]) {
-    #pragma HLS INLINE
+    #pragma HLS inline
 
     typename data_T::value_type data[CONFIG_T::n_chan];
     //#pragma HLS ARRAY_PARTITION variable=data complete
@@ -105,7 +105,7 @@ InitData:
         data[id] = data_pack[id];
     }
 
-    #pragma HLS INLINE recursive
+    #pragma HLS inline recursive
     CONFIG_T::mult_config::template kernel<typename data_T::value_type, typename res_T::value_type,
                                            typename CONFIG_T::mult_config>::dense(data, res, weights, biases);
 
@@ -124,7 +124,7 @@ template <class data_T, class res_T, typename CONFIG_T>
 void compute_depthwise_output_buffer_1d(const data_T &in_elem, hls::stream<res_T> &res_stream,
                                         typename CONFIG_T::weight_t weights[CONFIG_T::kernel_size * CONFIG_T::n_chan],
                                         typename CONFIG_T::bias_t biases[CONFIG_T::n_chan]) {
-    #pragma HLS INLINE
+    #pragma HLS inline
 
     // Thresholds
     const static int lShiftX = CONFIG_T::filt_width - 1;
@@ -148,7 +148,7 @@ void compute_depthwise_output_buffer_1d(const data_T &in_elem, hls::stream<res_T
     // Check to see if we have a full kernel
     if ((sX - lShiftX) == 0 && pX > lShiftX - 1) {
         // Dense multiply
-        #pragma HLS INLINE recursive
+        #pragma HLS inline recursive
         CONFIG_T::mult_config::template kernel<typename data_T::value_type, typename res_T::value_type,
                                                typename CONFIG_T::mult_config>::dense(kernel_data, res_out, weights, biases);
 
@@ -182,7 +182,7 @@ void compute_depthwise_output_buffer_2d(const data_T &in_elem,
                                         hls::stream<res_T> &res_stream,
                                         typename CONFIG_T::weight_t weights[CONFIG_T::kernel_size * CONFIG_T::n_chan],
                                         typename CONFIG_T::bias_t biases[CONFIG_T::n_chan]) {
-    #pragma HLS INLINE
+    #pragma HLS inline
 
     // Thresholds
     const static int lShiftX = CONFIG_T::filt_width - 1;
@@ -210,7 +210,7 @@ void compute_depthwise_output_buffer_2d(const data_T &in_elem,
     // Check to see if we have a full kernel
     if ((sX - lShiftX) == 0 && (sY - lShiftY) == 0 && pY > lShiftY - 1 && pX > lShiftX - 1) {
         // Dense multiply
-        #pragma HLS INLINE recursive
+        #pragma HLS inline recursive
         CONFIG_T::mult_config::template kernel<typename data_T::value_type, typename res_T::value_type,
                                                typename CONFIG_T::mult_config>::dense(kernel_data, res_out, weights, biases);
 

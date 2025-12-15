@@ -5,6 +5,7 @@ import tarfile
 from collections import OrderedDict
 from pathlib import Path
 from shutil import copyfile, copytree, rmtree
+import logging
 
 import numpy as np
 import yaml
@@ -104,14 +105,14 @@ class BambuWriter(Writer):
 
         if mode in ['partition', 'reshape']:
             if typ == 'complete':
-                template = '#pragma HLS ARRAY_{mode} variable={name} {type} dim={dim}'
+                template = '//#pragma HLS ARRAY_{mode} variable={name} {type} dim={dim}'
             else:
-                template = '#pragma HLS ARRAY_{mode} variable={name} {type} factor={factor} dim={dim}'
+                template = '//#pragma HLS ARRAY_{mode} variable={name} {type} factor={factor} dim={dim}'
 
             return template.format(mode=mode.upper(), name=variable.name, type=typ, factor=factor, dim=0)
 
         elif mode == 'stream':
-            return f'#pragma HLS STREAM variable={variable.name} depth={depth}'
+            return f'//#pragma HLS STREAM variable={variable.name} depth={depth}'
 
     def write_project_cpp(self, model):
         """Write the main architecture source file (myproject.cpp)
@@ -204,7 +205,7 @@ class BambuWriter(Writer):
 
                 pipeline_style = model.config.pipeline_style
                 pipeline_ii = model.config.pipeline_ii
-                pipeline_pragma = indent + f'#pragma HLS {pipeline_style.upper()}'
+                pipeline_pragma = indent + f'//#pragma HLS {pipeline_style.upper()}'
                 if pipeline_style == 'pipeline' and pipeline_ii is not None:
                     pipeline_pragma += f' II={pipeline_ii}\n'
                 else:
@@ -217,17 +218,17 @@ class BambuWriter(Writer):
                         newline += indent + self._make_array_pragma(o) + '\n'
                     # TODO discussed adding a handle for setting the interface mode for individual input and output arrays
                     # Probably the handle doesn't need to be exposed to the user but should be just set in hls_model.py
-                    newline += indent + '#pragma HLS INTERFACE ap_vld port={},{} \n'.format(
+                    newline += indent + '#pragma HLS interface mode=valid port={},{} \n'.format(
                         ','.join(all_inputs), ','.join(all_outputs)
                     )
                     newline += pipeline_pragma
 
                 if io_type == 'io_stream':
-                    newline += indent + '#pragma HLS INTERFACE axis port={},{} \n'.format(
+                    newline += indent + '#pragma HLS interface mode=axis port={},{} \n'.format(
                         ','.join(all_inputs), ','.join(all_outputs)
                     )
                     if all_brams:
-                        newline += indent + '#pragma HLS INTERFACE bram port={} \n'.format(','.join(all_brams))
+                        newline += indent + '//#pragma HLS INTERFACE bram port={} \n'.format(','.join(all_brams))
                     newline += pipeline_pragma
 
             elif '// hls-fpga-machine-learning insert layers' in line:
@@ -616,7 +617,16 @@ class BambuWriter(Writer):
                 # Concatenate the input, output, and bram variables. Filter out empty/null values
                 all_vars = ','.join(filter(None, [input_vars, output_vars, bram_vars]))
 
-                top_level = indent + f'{model.config.get_project_name()}({all_vars});\n'
+                top_level = '#ifdef  __BAMBU__\n'
+                for i,v in enumerate(model_inputs):
+                    top_level += indent + f'm_param_alloc({i}, sizeof({v.name}));\n'
+                for i,v in enumerate(model_outputs):
+                    top_level += indent + f'm_param_alloc({i+len(model_inputs)}, sizeof({v.name}));\n'
+                # not sure if this is needed
+                # for i,v in enumerate(bram_vars): 
+                #     top_level += f'm_param_alloc({i}, sizeof({v}));\n'
+                top_level += '#endif\n'
+                top_level += indent + f'{model.config.get_project_name()}({all_vars});\n'
 
                 newline += top_level
 
@@ -1048,14 +1058,27 @@ class BambuWriter(Writer):
 
         headers = [os.path.basename(h) for h in glob.glob(srcpath + '*.h')]
 
+        # Check if gcem folder is present in nnet_utils, and copy it if so
+        gcem_srcpath = os.path.join(srcpath, 'gcem')
+        gcem_dstpath = os.path.join(dstpath, 'gcem')
+        if os.path.isdir(gcem_srcpath):
+            if os.path.exists(gcem_dstpath):
+                rmtree(gcem_dstpath)
+            copytree(gcem_srcpath, gcem_dstpath)
+        else:
+            logging.warning(
+                "The 'gcem' folder was not found in nnet_utils. "
+                "If you need it, make sure to initialize this submodule:\n"
+                "    git submodule update --init hls4ml/templates/bambu/nnet_utils/gcem"
+            )
         for h in headers:
             copyfile(srcpath + h, dstpath + h)
 
-        # ap_types
+        # ac_types
         filedir = os.path.dirname(os.path.abspath(__file__))
 
-        srcpath = os.path.join(filedir, '../templates/bambu/ap_types/')
-        dstpath = f'{model.config.get_output_dir()}/firmware/ap_types/'
+        srcpath = os.path.join(filedir, '../templates/bambu/ac_types/')
+        dstpath = f'{model.config.get_output_dir()}/firmware/ac_types/'
 
         if os.path.exists(dstpath):
             rmtree(dstpath)

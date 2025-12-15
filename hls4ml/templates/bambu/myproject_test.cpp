@@ -5,11 +5,16 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
 #include <vector>
 
 #include "firmware/myproject.h"
 #include "firmware/nnet_utils/nnet_helpers.h"
 
+#ifdef  __BAMBU__
+#include <mdpi/mdpi_user.h>
+#endif
 // hls-fpga-machine-learning insert bram
 
 #define CHECKPOINT 5000

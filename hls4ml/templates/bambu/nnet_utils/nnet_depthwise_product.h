@@ -270,7 +270,7 @@ class DepthwiseDenseLatency : public DepthwiseDenseKernel<data_T, res_T, CONFIG_
     static void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
                       typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
                       typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-        #pragma HLS INLINE
+        #pragma HLS inline
         depthwise_product_latency<data_T, res_T, CONFIG_T>(data, res, weights, biases);
     }
 };
@@ -281,7 +281,7 @@ class DepthwiseDenseResource_rf_leq_nout : public DepthwiseDenseKernel<data_T, r
     static void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
                       typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
                       typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-        #pragma HLS INLINE
+        #pragma HLS inline
         depthwise_product_resource_rf_leq_nout<data_T, res_T, CONFIG_T>(data, res, weights, biases);
     }
 };
@@ -292,7 +292,7 @@ class DepthwiseDenseResource_rf_gt_nout_rem0 : public DepthwiseDenseKernel<data_
     static void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
                       typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
                       typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-        #pragma HLS INLINE
+        #pragma HLS inline
         depthwise_product_resource_rf_gt_nout_rem0<data_T, res_T, CONFIG_T>(data, res, weights, biases);
     }
 };
@@ -303,7 +303,7 @@ class DepthwiseDenseResource_rf_gt_nout : public DepthwiseDenseKernel<data_T, re
     static void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
                       typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
                       typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
-        #pragma HLS INLINE
+        #pragma HLS inline
         depthwise_product_resource_gt_nout<data_T, res_T, CONFIG_T>(data, res, weights, biases);
     }
 };

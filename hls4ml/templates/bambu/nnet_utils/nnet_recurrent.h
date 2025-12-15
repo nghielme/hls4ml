@@ -688,7 +688,7 @@ void gru_stack(hls::stream<data_T> &data_stream, hls::stream<res_T> &res_stream,
                typename CONFIG_T::recurrent_bias_t param_br[CONFIG_T::n_state * 3]) {
 
     typename res_T::value_type h_newstate[CONFIG_T::n_state];
-    #pragma HLS ARRAY_PARTITION variable=h_newstate complete
+    //#pragma HLS ARRAY_PARTITION variable=h_newstate complete
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_state; ii++) {
         //#pragma HLS UNROLL

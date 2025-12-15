@@ -7,8 +7,10 @@
 #include <iostream>
 #include <map>
 #include <math.h>
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <vector>
 
 namespace nnet {

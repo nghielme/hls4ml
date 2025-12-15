@@ -17,7 +17,7 @@ struct time_distributed_config {
 template <class data_T, typename CONFIG_T>
 void read_time_step_2d(unsigned time_step, data_T data[CONFIG_T::n_time_steps * CONFIG_T::n_chan],
                        data_T res[CONFIG_T::n_chan]) {
-    #pragma HLS PIPELINE
+    //#pragma HLS PIPELINE
 
 ChannelLoop:
     for (unsigned i = 0; i < CONFIG_T::n_chan; i++) {
