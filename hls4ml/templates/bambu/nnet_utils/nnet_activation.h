@@ -732,40 +732,40 @@ void thresholded_relu(data_T data[CONFIG_T::n_in], param_T theta, res_T res[CONF
 // *************************************************
 constexpr inline float softplus_fcn_float(float input)
 {
- using gcem::exp;
- using gcem::log;
- return log(exp(input) + 1.); 
+    using gcem::exp;
+    using gcem::log;
+    return log(exp(input) + 1.); 
 }
 
-template <typename CONFIG_T, int N_TABLE> void init_softplus_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
-    // Default softplus function:
-    //   result = log(exp(x) + 1)
-    for (int ii = 0; ii < N_TABLE; ii++) {
-        // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
-        float in_val = 2 * 8.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
-        // Next, compute lookup table function
-        typename CONFIG_T::table_t real_val = softplus_fcn_float(in_val);
-        // std::cout << "Lookup table In Value: " << in_val << " Result: " << real_val << std::endl;
-        table_out[ii] = real_val;
-    }
+// Helper: compute value for a single index
+template <typename CONFIG_T, std::size_t N_TABLE>
+constexpr typename CONFIG_T::table_t compute_softplus_fcn_float_index(size_t ii)
+{
+    // Convert from table index to X-value (signed 8-bit, range -8 to +8)
+    float in_val = 2 * 8.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
+    // Compute lookup table function
+    typename CONFIG_T::table_t real_val = softplus_fcn_float(in_val);
+    return real_val;
+}
+
+// Helper: unroll index sequence to initialize array
+template <typename CONFIG_T, std::size_t N, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_softplus_table_impl(std::index_sequence<I...>)
+{
+    return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_softplus_fcn_float_index<CONFIG_T, N>(I)...};
+}
+
+// Public function: creates sequence and returns array
+template <typename CONFIG_T, std::size_t N>
+constexpr static std::array<typename CONFIG_T::table_t, N> init_softplus_table()
+{
+    return init_softplus_table_impl<CONFIG_T, N>(std::make_index_sequence<N>{});
 }
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
-    // Initialize the lookup table
-#ifdef __HLS_SYN__
-    bool initialized = false;
-    typename CONFIG_T::table_t softplus_table[CONFIG_T::table_size];
-#else
-    static bool initialized = false;
-    static typename CONFIG_T::table_t softplus_table[CONFIG_T::table_size];
-#endif
-    if (!initialized) {
-        init_softplus_table<CONFIG_T, CONFIG_T::table_size>(softplus_table);
-        initialized = true;
-    }
-
-    //#pragma HLS PIPELINE
+    // Initialize the lookup table at COMPILE TIME
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> softplus_table = init_softplus_table<CONFIG_T, CONFIG_T::table_size>();
 
     // Index into the lookup table based on data
     int data_round;
@@ -774,10 +774,10 @@ void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     for (int ii = 0; ii < CONFIG_T::n_in; ii++) {
         data_round = data[ii] * CONFIG_T::table_size / 16;
         index = data_round + 8 * CONFIG_T::table_size / 16;
-        if (index < 0)
-            index = 0;
-        if (index > CONFIG_T::table_size - 1)
-            index = CONFIG_T::table_size - 1;
+        
+        if (index < 0) index = 0;
+        else if (index > CONFIG_T::table_size - 1) index = CONFIG_T::table_size - 1;
+        
         res[ii] = (res_T)softplus_table[index];
     }
 }

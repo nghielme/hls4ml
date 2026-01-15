@@ -1041,6 +1041,21 @@ class BambuWriter(Writer):
         if not os.path.exists(dstpath):
             os.mkdir(dstpath)
 
+
+        # Copy GCEM 
+        gcem_src = os.path.join(filedir, '../templates/bambu/nnet_utils/gcem/')
+        gcem_dst = os.path.join(dstpath, 'gcem')
+
+        if os.path.exists(gcem_src):
+            if os.path.exists(gcem_dst):
+                rmtree(gcem_dst)
+            copytree(gcem_src, gcem_dst)
+        else:
+            print(f"WARNING: GCEM Folder not found in {gcem_src}")
+        
+
+
+
         headers = [os.path.basename(h) for h in glob.glob(srcpath + '*.h')]
 
         # Check if gcem folder is present in nnet_utils, and copy it if so
