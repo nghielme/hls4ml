@@ -229,7 +229,7 @@ def test_auto_precision_sepconv(
 
     # Compile will fail if there are still UnspecifiedPrecisionTypes in the model
     if backend == 'Bambu':
-        hls_model.build(args=['--simulate'])
+        hls_model.build(args=[f'--generate-tb={tb_file}', '--simulate'])
     else:
         hls_model.compile()
 
@@ -274,7 +274,7 @@ def test_auto_precision_dense(keras_model_dense, data_1d, io_type, backend):
 
     # Compile will fail if there are still UnspecifiedPrecisionTypes in the model
     if backend == 'Bambu':
-        hls_model.build(args=['--simulate'])
+        hls_model.build(args=[f'--generate-tb={tb_file}', '--simulate'])
     else:
         hls_model.compile()
 
