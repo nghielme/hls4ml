@@ -153,15 +153,36 @@ def test_auto_precision_conv(keras_model_conv1d, keras_model_conv2d, data_2d, da
     }
 
     odir = str(test_root_path / f'hls4mlprj_auto_{model_type}_{backend}_{io_type}')
+    input_data_tb = None
+    output_data_tb = None
+    y_keras = None
+    if backend == 'Bambu':
+        input_data_tb = test_root_path / f'tb_input_auto_{model_type}_{io_type}.npy'
+        output_data_tb = test_root_path / f'tb_output_auto_{model_type}_{io_type}.npy'
+        y_keras = model.predict(data).flatten()
+        np.save(input_data_tb, data)
+        np.save(output_data_tb, y_keras)
+
     hls_model = hls4ml.converters.convert_from_keras_model(
-        model, hls_config=config, io_type=io_type, output_dir=odir, backend=backend
+        model,
+        hls_config=config,
+        io_type=io_type,
+        output_dir=odir,
+        backend=backend,
+        input_data_tb=str(input_data_tb) if input_data_tb is not None else None,
+        output_data_tb=str(output_data_tb) if output_data_tb is not None else None,
     )
 
     # Compile will fail if there are still UnspecifiedPrecisionTypes in the model
-    hls_model.compile()
+    if backend == 'Bambu':
+        tb_file = f'{hls_model.config.get_project_name()}_test.cpp'
+        hls_model.build(args=[f'--generate-tb={tb_file}', '--simulate'])
+    else:
+        hls_model.compile()
 
     # Predict
-    y_keras = model.predict(data).flatten()
+    if y_keras is None:
+        y_keras = model.predict(data).flatten()
     y_hls = hls_model.predict(data).flatten()
     np.testing.assert_allclose(y_keras, y_hls, rtol=2e-2, atol=5e-2, verbose=True)
 
@@ -207,7 +228,10 @@ def test_auto_precision_sepconv(
     )
 
     # Compile will fail if there are still UnspecifiedPrecisionTypes in the model
-    hls_model.compile()
+    if backend == 'Bambu':
+        hls_model.build(args=['--simulate'])
+    else:
+        hls_model.compile()
 
     # Predict
     y_keras = model.predict(data).flatten()
@@ -249,7 +273,10 @@ def test_auto_precision_dense(keras_model_dense, data_1d, io_type, backend):
     )
 
     # Compile will fail if there are still UnspecifiedPrecisionTypes in the model
-    hls_model.compile()
+    if backend == 'Bambu':
+        hls_model.build(args=['--simulate'])
+    else:
+        hls_model.compile()
 
     # Predict
     y_keras = model.predict(data).flatten()

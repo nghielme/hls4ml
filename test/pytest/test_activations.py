@@ -41,19 +41,38 @@ def test_activations(backend, activation, name, shape, io_type):
     # Subtract 0.5 to include negative values
     X = np.random.rand(1000, *shape) - 0.5
 
+    shape_tag = 'x'.join(str(dim) for dim in shape)
     input = Input(shape=shape)
     activation = activation(input)
     keras_model = Model(inputs=input, outputs=activation)
+    keras_prediction = keras_model.predict(X)
+
+    input_data_tb = None
+    output_data_tb = None
+    if backend == 'Bambu':
+        input_data_tb = test_root_path / f'tb_input_{shape_tag}_{io_type}_{name}.npy'
+        output_data_tb = test_root_path / f'tb_output_{shape_tag}_{io_type}_{name}.npy'
+        np.save(input_data_tb, X)
+        np.save(output_data_tb, keras_prediction)
 
     hls_config = hls4ml.utils.config_from_keras_model(keras_model, granularity='name', backend=backend)
-    output_dir = str(test_root_path / 'hls4mlprj_activations_{}_{}_{}_{}').format(backend, io_type, str(shape), name)
+    output_dir = str(test_root_path / 'hls4mlprj_activations_{}_{}_{}_{}').format(backend, io_type, shape_tag, name)
 
     hls_model = hls4ml.converters.convert_from_keras_model(
-        keras_model, hls_config=hls_config, io_type=io_type, output_dir=output_dir, backend=backend
+        keras_model,
+        hls_config=hls_config,
+        io_type=io_type,
+        output_dir=output_dir,
+        backend=backend,
+        input_data_tb=str(input_data_tb) if input_data_tb is not None else None,
+        output_data_tb=str(output_data_tb) if output_data_tb is not None else None,
     )
-    hls_model.compile()
+    if backend == 'Bambu':
+        tb_file = f'{hls_model.config.get_project_name()}_test.cpp'
+        hls_model.build(args=[f'--generate-tb={tb_file}', '--simulate'])
+    else:
+        hls_model.compile()
 
-    keras_prediction = keras_model.predict(X)
     hls_prediction = hls_model.predict(X).reshape(keras_prediction.shape)
 
     np.testing.assert_allclose(hls_prediction, keras_prediction, rtol=2e-2, atol=2e-2)
