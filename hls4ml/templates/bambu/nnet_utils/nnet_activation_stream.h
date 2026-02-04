@@ -613,6 +613,7 @@ ThresholdedReLUActLoop:
 
 template <class data_T, class res_T, typename CONFIG_T> void softplus(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     // Initialize the lookup table
+#ifdef OLD_SOFTPLUS
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::table_t softplus_table[CONFIG_T::table_size];
@@ -624,6 +625,10 @@ template <class data_T, class res_T, typename CONFIG_T> void softplus(hls::strea
         init_softplus_table<CONFIG_T, CONFIG_T::table_size>(softplus_table);
         initialized = true;
     }
+#else
+    static const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> softplus_table =
+        init_softplus_table<CONFIG_T, CONFIG_T::table_size>();
+#endif
 
 SoftplusActLoop:
     for (int i = 0; i < CONFIG_T::n_in / res_T::size; i++) {

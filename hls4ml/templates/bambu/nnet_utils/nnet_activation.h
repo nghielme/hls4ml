@@ -719,6 +719,8 @@ constexpr inline float softplus_fcn_float(float input) {
     return log(exp(input) + 1.);
 }
 
+#ifdef OLD_SOFTPLUS
+
 template <typename CONFIG_T, int N_TABLE> void init_softplus_table(typename CONFIG_T::table_t table_out[N_TABLE]) {
     // Default softplus function:
     //   result = log(exp(x) + 1)
@@ -731,10 +733,30 @@ template <typename CONFIG_T, int N_TABLE> void init_softplus_table(typename CONF
         table_out[ii] = real_val;
     }
 }
+#else
+template <typename CONFIG_T, std::size_t N_TABLE>
+constexpr typename CONFIG_T::table_t compute_softplus_fcn_float_index(std::size_t ii) {
+    // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
+    float in_val = 2 * 8.0f * (static_cast<float>(ii) - float(N_TABLE) / 2.0f) / float(N_TABLE);
+    // Next, compute lookup table function
+    typename CONFIG_T::table_t real_val = softplus_fcn_float(in_val);
+    return real_val;
+}
 
+template <typename CONFIG_T, std::size_t N, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_softplus_table(std::index_sequence<I...>) {
+    return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_softplus_fcn_float_index<CONFIG_T, N>(I)...};
+}
+
+template <typename CONFIG_T, std::size_t N>
+constexpr static std::array<typename CONFIG_T::table_t, N> init_softplus_table() {
+    return init_softplus_table<CONFIG_T, N>(std::make_index_sequence<N>{});
+}
+#endif
 template <class data_T, class res_T, typename CONFIG_T>
 void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
     // Initialize the lookup table
+#ifdef OLD_SOFTPLUS
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::table_t softplus_table[CONFIG_T::table_size];
@@ -746,7 +768,10 @@ void softplus(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in]) {
         init_softplus_table<CONFIG_T, CONFIG_T::table_size>(softplus_table);
         initialized = true;
     }
-
+#else
+    static const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> softplus_table =
+        init_softplus_table<CONFIG_T, CONFIG_T::table_size>();
+#endif
     //#pragma HLS PIPELINE
 
     // Index into the lookup table based on data
