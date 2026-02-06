@@ -10,6 +10,18 @@ import hls4ml
 test_root_path = Path(__file__).parent
 
 
+def _pytest_case_id(request):
+    callspec = getattr(request.node, 'callspec', None)
+    if callspec is not None:
+        return callspec.id
+
+    node_name = request.node.name
+    if '[' in node_name and node_name.endswith(']'):
+        return node_name.split('[', 1)[1][:-1]
+
+    return node_name
+
+
 @pytest.mark.parametrize(
     'backend, strategy',
     [
@@ -26,7 +38,7 @@ test_root_path = Path(__file__).parent
 )
 @pytest.mark.parametrize('io_type', ['io_parallel', 'io_stream'])
 @pytest.mark.parametrize('shape', [(4, 3), (4, 1), (2, 3, 2), (1, 3, 1)])
-def test_multi_dense(backend, strategy, io_type, shape):
+def test_multi_dense(backend, strategy, io_type, shape, request):
     model = tf.keras.models.Sequential()
     model.add(Dense(7, input_shape=shape, activation='relu'))
     model.add(Dense(2, activation='relu'))
@@ -48,7 +60,7 @@ def test_multi_dense(backend, strategy, io_type, shape):
 
     config = hls4ml.utils.config_from_keras_model(model, granularity='name', backend=backend)
     config['Model']['Strategy'] = strategy
-    output_dir = str(test_root_path / f'hls4mlprj_multi_dense_{backend}_{strategy}_{io_type}_{shapestr}')
+    output_dir = str(test_root_path / _pytest_case_id(request))
 
     hls_model = hls4ml.converters.convert_from_keras_model(
         model,
@@ -60,11 +72,10 @@ def test_multi_dense(backend, strategy, io_type, shape):
         output_data_tb=str(output_data_tb) if output_data_tb is not None else None,
     )
 
+    hls_model.compile()
     if backend == 'Bambu':
         tb_file = f'{hls_model.config.get_project_name()}_test.cpp'
-        hls_model.build(args=[f'--generate-tb={tb_file}', '--simulate'])
-    else:
-        hls_model.compile()
+        hls_model.build(check=True, args=[f'--generate-tb={tb_file}', '--simulate', '--generate-interface=INFER', '--compiler=I386_CLANG16'])
 
     hls_prediction = hls_model.predict(X_input).reshape(keras_prediction.shape)
 

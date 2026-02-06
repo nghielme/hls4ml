@@ -10,6 +10,18 @@ import hls4ml
 
 test_root_path = Path(__file__).parent
 
+
+def _pytest_case_id(request):
+    callspec = getattr(request.node, 'callspec', None)
+    if callspec is not None:
+        return callspec.id
+
+    node_name = request.node.name
+    if '[' in node_name and node_name.endswith(']'):
+        return node_name.split('[', 1)[1][:-1]
+
+    return node_name
+
 # Variable 'name' is simply used as an identifier for the activation
 
 
@@ -35,7 +47,7 @@ test_root_path = Path(__file__).parent
         (Activation('hard_sigmoid'), 'hard_sigmoid'),
     ],
 )
-def test_activations(backend, activation, name, shape, io_type):
+def test_activations(backend, activation, name, shape, io_type, request):
     if name == 'prelu' and shape == (8, 8, 3):
         return
     # Subtract 0.5 to include negative values
@@ -56,7 +68,7 @@ def test_activations(backend, activation, name, shape, io_type):
         np.save(output_data_tb, keras_prediction)
 
     hls_config = hls4ml.utils.config_from_keras_model(keras_model, granularity='name', backend=backend)
-    output_dir = str(test_root_path / 'hls4mlprj_activations_{}_{}_{}_{}').format(backend, io_type, shape_tag, name)
+    output_dir = str(test_root_path / _pytest_case_id(request))
 
     hls_model = hls4ml.converters.convert_from_keras_model(
         keras_model,
@@ -67,11 +79,10 @@ def test_activations(backend, activation, name, shape, io_type):
         input_data_tb=str(input_data_tb) if input_data_tb is not None else None,
         output_data_tb=str(output_data_tb) if output_data_tb is not None else None,
     )
+    hls_model.compile()
     if backend == 'Bambu':
         tb_file = f'{hls_model.config.get_project_name()}_test.cpp'
-        hls_model.build(args=[f'--generate-tb={tb_file}', '--simulate'])
-    else:
-        hls_model.compile()
+        hls_model.build(check=True, args=[f'--generate-tb={tb_file}', '--simulate', '--generate-interface=INFER', '--compiler=I386_CLANG16'])
 
     hls_prediction = hls_model.predict(X).reshape(keras_prediction.shape)
 

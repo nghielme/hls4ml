@@ -21,6 +21,18 @@ from hls4ml.model.optimizer.passes.infer_precision import _get_precision_from_co
 
 test_root_path = Path(__file__).parent
 
+
+def _pytest_case_id(request):
+    callspec = getattr(request.node, 'callspec', None)
+    if callspec is not None:
+        return callspec.id
+
+    node_name = request.node.name
+    if '[' in node_name and node_name.endswith(']'):
+        return node_name.split('[', 1)[1][:-1]
+
+    return node_name
+
 in_height = 10
 in_width = 12
 in_feat = 4
@@ -121,7 +133,9 @@ def keras_model_sepconv2d():
 @pytest.mark.parametrize('io_type', ['io_stream', 'io_parallel'])
 @pytest.mark.parametrize('backend', ['Vivado', 'Vitis', 'Quartus', 'Bambu'])
 @pytest.mark.parametrize('model_type', ['conv1d', 'conv2d'])
-def test_auto_precision_conv(keras_model_conv1d, keras_model_conv2d, data_2d, data_3d, model_type, io_type, backend):
+def test_auto_precision_conv(
+    keras_model_conv1d, keras_model_conv2d, data_2d, data_3d, model_type, io_type, backend, request
+):
     if model_type == 'conv1d':
         model = keras_model_conv1d
         data = data_2d
@@ -152,14 +166,13 @@ def test_auto_precision_conv(keras_model_conv1d, keras_model_conv2d, data_2d, da
         },
     }
 
-    odir = str(test_root_path / f'hls4mlprj_auto_{model_type}_{backend}_{io_type}')
+    odir = str(test_root_path / _pytest_case_id(request))
     input_data_tb = None
     output_data_tb = None
-    y_keras = None
+    y_keras = model.predict(data).flatten()
     if backend == 'Bambu':
         input_data_tb = test_root_path / f'tb_input_auto_{model_type}_{io_type}.npy'
         output_data_tb = test_root_path / f'tb_output_auto_{model_type}_{io_type}.npy'
-        y_keras = model.predict(data).flatten()
         np.save(input_data_tb, data)
         np.save(output_data_tb, y_keras)
 
@@ -174,15 +187,12 @@ def test_auto_precision_conv(keras_model_conv1d, keras_model_conv2d, data_2d, da
     )
 
     # Compile will fail if there are still UnspecifiedPrecisionTypes in the model
+    hls_model.compile()
     if backend == 'Bambu':
         tb_file = f'{hls_model.config.get_project_name()}_test.cpp'
-        hls_model.build(args=[f'--generate-tb={tb_file}', '--simulate'])
-    else:
-        hls_model.compile()
+        hls_model.build(check=True, args=[f'--generate-tb={tb_file}', '--simulate', '--generate-interface=INFER', '--compiler=I386_CLANG16'])
 
     # Predict
-    if y_keras is None:
-        y_keras = model.predict(data).flatten()
     y_hls = hls_model.predict(data).flatten()
     np.testing.assert_allclose(y_keras, y_hls, rtol=2e-2, atol=5e-2, verbose=True)
 
@@ -191,7 +201,7 @@ def test_auto_precision_conv(keras_model_conv1d, keras_model_conv2d, data_2d, da
 @pytest.mark.parametrize('backend', ['Vivado', 'Vitis'])  # No SeparableConv1D/2D in Quartus
 @pytest.mark.parametrize('model_type', ['sepconv1d', 'sepconv2d'])
 def test_auto_precision_sepconv(
-    keras_model_sepconv1d, keras_model_sepconv2d, data_2d, data_3d, model_type, io_type, backend
+    keras_model_sepconv1d, keras_model_sepconv2d, data_2d, data_3d, model_type, io_type, backend, request
 ):
     if model_type == 'sepconv1d':
         model = keras_model_sepconv1d
@@ -222,26 +232,36 @@ def test_auto_precision_sepconv(
             },
         },
     }
-    odir = str(test_root_path / f'hls4mlprj_auto_{model_type}_{backend}_{io_type}')
+    odir = str(test_root_path / _pytest_case_id(request))
+    input_data_tb = None
+    output_data_tb = None
+    y_keras = model.predict(data).flatten()
+    if backend == 'Bambu':
+        input_data_tb = test_root_path / f'tb_input_auto_{model_type}_{io_type}.npy'
+        output_data_tb = test_root_path / f'tb_output_auto_{model_type}_{io_type}.npy'
+        np.save(input_data_tb, data)
+        np.save(output_data_tb, y_keras)
+
     hls_model = hls4ml.converters.convert_from_keras_model(
-        model, hls_config=config, io_type=io_type, output_dir=odir, backend=backend
+        model, hls_config=config, io_type=io_type, output_dir=odir, backend=backend,
+        input_data_tb=str(input_data_tb) if input_data_tb is not None else None,
+        output_data_tb=str(output_data_tb) if output_data_tb is not None else None,
     )
 
     # Compile will fail if there are still UnspecifiedPrecisionTypes in the model
+    hls_model.compile()
     if backend == 'Bambu':
-        hls_model.build(args=[f'--generate-tb={tb_file}', '--simulate'])
-    else:
-        hls_model.compile()
+        tb_file = f'{hls_model.config.get_project_name()}_test.cpp'
+        hls_model.build(check=True, args=[f'--generate-tb={tb_file}', '--simulate', '--generate-interface=INFER', '--compiler=I386_CLANG16'])
 
     # Predict
-    y_keras = model.predict(data).flatten()
     y_hls = hls_model.predict(data).flatten()
     np.testing.assert_allclose(y_keras, y_hls, rtol=2e-2, atol=5e-2, verbose=True)
 
 
 @pytest.mark.parametrize('io_type', ['io_stream', 'io_parallel'])
 @pytest.mark.parametrize('backend', ['Vivado', 'Vitis', 'Quartus'])
-def test_auto_precision_dense(keras_model_dense, data_1d, io_type, backend):
+def test_auto_precision_dense(keras_model_dense, data_1d, io_type, backend, request):
     model = keras_model_dense
     data = data_1d
 
@@ -267,19 +287,29 @@ def test_auto_precision_dense(keras_model_dense, data_1d, io_type, backend):
             },
         },
     }
-    odir = str(test_root_path / f'hls4mlprj_auto_dense_{backend}_{io_type}')
+    odir = str(test_root_path / _pytest_case_id(request))
+    input_data_tb = None
+    output_data_tb = None
+    y_keras = model.predict(data).flatten()
+    if backend == 'Bambu':
+        input_data_tb = test_root_path / f'tb_input_auto_{model_type}_{io_type}.npy'
+        output_data_tb = test_root_path / f'tb_output_auto_{model_type}_{io_type}.npy'
+        np.save(input_data_tb, data)
+        np.save(output_data_tb, y_keras)
+
     hls_model = hls4ml.converters.convert_from_keras_model(
-        model, hls_config=config, io_type=io_type, output_dir=odir, backend=backend
+        model, hls_config=config, io_type=io_type, output_dir=odir, backend=backend,
+        input_data_tb=str(input_data_tb) if input_data_tb is not None else None,
+        output_data_tb=str(output_data_tb) if output_data_tb is not None else None,
     )
 
     # Compile will fail if there are still UnspecifiedPrecisionTypes in the model
+    hls_model.compile()
     if backend == 'Bambu':
-        hls_model.build(args=[f'--generate-tb={tb_file}', '--simulate'])
-    else:
-        hls_model.compile()
+        tb_file = f'{hls_model.config.get_project_name()}_test.cpp'
+        hls_model.build(check=True, args=[f'--generate-tb={tb_file}', '--simulate', '--generate-interface=INFER', '--compiler=I386_CLANG16'])
 
     # Predict
-    y_keras = model.predict(data).flatten()
     y_hls = hls_model.predict(data).flatten()
     np.testing.assert_allclose(y_keras, y_hls, rtol=2e-2, atol=5e-2, verbose=True)
 
