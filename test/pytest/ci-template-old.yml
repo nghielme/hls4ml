@@ -1,0 +1,77 @@
+.pytest:
+  stage: test
+  image: gitlab-registry.cern.ch/edge-spaice/hls4ml-bambu-backend-pipeline:latest
+  tags:
+    - corellia
+
+  variables:
+    # Put your SharePoint direct-download URL here (can also be set in GitLab CI/CD variables)
+    BAMBU_URL: "https://polimi365-my.sharepoint.com/:u:/g/personal/10064870_polimi_it/IQCfzxB3q-chQqz5JpRZ1JHYASOIqKLCZn9ca8DBWqr4n4A?e=5s4ieC&download=1"
+
+    # Fixed locations
+    BAMBU_CACHE_DIR: "$CI_PROJECT_DIR/.cache/bambu"
+    BAMBU_APPIMAGE: "$CI_PROJECT_DIR/.cache/bambu/bambu.AppImage"
+    BAMBU_INSTALL_DIR: "$CI_PROJECT_DIR/.tools/bambu"
+    BAMBU_BIN_DIR: "$CI_PROJECT_DIR/.tools/bambu/bin"
+
+    # Option A: extract in-place (AppImage creates this directory)
+    BAMBU_EXTRACT_DIR: "$CI_PROJECT_DIR/.tools/bambu/squashfs-root"
+
+  before_script:
+    - eval "$(conda shell.bash hook)"
+    - conda activate hls4ml-testing
+    - git config --global --add safe.directory "$CI_PROJECT_DIR"
+    - git submodule update --init --recursive hls4ml/templates/catapult/
+    - git submodule update --init --recursive hls4ml/templates/bambu/
+    - if [ $EXAMPLEMODEL == 1 ]; then git submodule update --init example-models; fi
+    - pip install .[da,testing,sr,optimization]
+    # -------------------------
+    # Bambu install (Option A)
+    # -------------------------
+    - mkdir -p "$BAMBU_CACHE_DIR" "$BAMBU_INSTALL_DIR" "$BAMBU_BIN_DIR"
+    - |
+      echo "Downloading Bambu AppImage (always)..."
+      rm -f "$BAMBU_APPIMAGE"
+      wget --user-agent="Mozilla/5.0" --load-cookies "$COOKIES_FILE" \
+        -O "$BAMBU_APPIMAGE" \
+        "$BAMBU_URL"
+    - chmod +x "$BAMBU_APPIMAGE"
+    - |
+      echo "Extracting Bambu..."
+      cd "$BAMBU_INSTALL_DIR"
+      rm -rf squashfs-root  # avoid stale extracts
+      "$BAMBU_APPIMAGE" --appimage-extract >/dev/null
+    - ln -sf "$BAMBU_EXTRACT_DIR/usr/bin/bambu" "$BAMBU_BIN_DIR/bambu"
+    - export PATH="$BAMBU_BIN_DIR:$PATH"
+    - bambu --help >/dev/null || true
+
+    # set up vivado_hls command
+    - mkdir -p cmd_vivado_${VIVADO_VERSION}
+    - echo '#!/bin/bash' > cmd_vivado_${VIVADO_VERSION}/vivado_hls
+    - echo "apptainer exec --cleanenv --env LANG=C,LC_ALL=C /cvmfs/projects.cern.ch/hls4ml/vivado/${VIVADO_VERSION} vivado_hls \"\$@\"" >> cmd_vivado_${VIVADO_VERSION}/vivado_hls
+    - chmod +x cmd_vivado_${VIVADO_VERSION}/vivado_hls
+    - export PATH=$PWD/cmd_vivado_${VIVADO_VERSION}:$PATH
+
+    # set up vitis-run command
+    - mkdir -p cmd_vitis_${VITIS_VERSION}
+    - echo '#!/bin/bash' > cmd_vitis_${VITIS_VERSION}/vitis-run
+    - echo "apptainer exec /cvmfs/projects.cern.ch/hls4ml/vitis/${VITIS_VERSION} vitis-run \"\$@\"" >> cmd_vitis_${VITIS_VERSION}/vitis-run
+    - chmod +x cmd_vitis_${VITIS_VERSION}/vitis-run
+    - export PATH=$PWD/cmd_vitis_${VITIS_VERSION}:$PATH
+
+    # Load Intel oneAPI environment variables
+    - source /opt/intel/oneapi/setvars.sh --force
+  script:
+    - cd "$CI_PROJECT_DIR/test/pytest"
+    - pytest $PYTESTFILE -rA --cov-report xml --cov-report term --cov=hls4ml --junitxml=report.xml --randomly-seed=42 --randomly-dont-reorganize --randomly-dont-reset-seed -k "Bambu"
+  artifacts:
+    when: always
+    reports:
+      junit:
+        - test/pytest/report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: test/pytest/coverage.xml
+    paths:
+      - test/pytest/hls4mlprj*.tar.gz
+      - test/pytest/synthesis_report_*.json

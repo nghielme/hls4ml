@@ -201,12 +201,12 @@ void init_exp_table(typename CONFIG_T::exp_table_t table_out[CONFIG_T::exp_table
 template <class data_T, typename CONFIG_T, bool negative>
 constexpr typename CONFIG_T::exp_table_t compute_exp_index(size_t i) {
     float x = softmax_real_val_from_idx<data_T, CONFIG_T::exp_table_size>(i) * CONFIG_T::exp_scale;
-    typename CONFIG_T::exp_table_t exp_x = exp_fcn_float(x);
     if (negative) {
         // for normalized inputs, we keep the normalization values positive (x_bar = x_max - x)
         // so we need to negate the input (exp(-x_bar) = exp(x - x_max))
         x = -x;
     }
+    typename CONFIG_T::exp_table_t exp_x = exp_fcn_float(x);
     return exp_x;
 }
 
@@ -271,7 +271,7 @@ void softmax_latency(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice
         initialized = true;
     }
 #else
-    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::table_size> exp_table =
+    static constexpr const ::std::array<typename CONFIG_T::exp_table_t, CONFIG_T::exp_table_size> exp_table =
         init_exp_table<data_T, CONFIG_T, false>();
 #endif
 #ifdef OLD_INVERT
@@ -290,7 +290,7 @@ void softmax_latency(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice
     }
 #else
     static constexpr const ::std::array<typename CONFIG_T::inv_table_t, CONFIG_T::inv_table_size> invert_table =
-        init_inv_table<typename CONFIG_T::inv_table_t, CONFIG_T>();
+        init_inv_table<typename CONFIG_T::inv_inp_t, CONFIG_T>();
 #endif
     // Calculate all the e^x's
     typename CONFIG_T::accum_t exp_res[CONFIG_T::n_slice];
@@ -389,6 +389,45 @@ void softmax_stable(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
     }
 }
 
+// Compile-time constexpr helpers for softmax_legacy (default path)
+#ifndef OLD_SOFTMAX_LEGACY
+template <typename CONFIG_T, std::size_t N_TABLE>
+constexpr typename CONFIG_T::table_t compute_exp_fcn_float_index_legacy(size_t ii) {
+    float in_val = 2 * 8.0 * (ii - float(N_TABLE) / 2.0) / float(N_TABLE);
+    typename CONFIG_T::table_t real_val = exp_fcn_float(in_val);
+    return real_val;
+}
+
+template <typename CONFIG_T, std::size_t N, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_exp_table_legacy(std::index_sequence<I...>) {
+    return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_exp_fcn_float_index_legacy<CONFIG_T, N>(I)...};
+}
+
+template <typename CONFIG_T, std::size_t N>
+constexpr static std::array<typename CONFIG_T::table_t, N> init_exp_table_legacy() {
+    return init_exp_table_legacy<CONFIG_T, N>(std::make_index_sequence<N>{});
+}
+
+template <typename CONFIG_T, std::size_t N_TABLE>
+constexpr typename CONFIG_T::table_t compute_invert_fcn_float_index_legacy(size_t ii) {
+    float in_val = 64.0 * ii / float(N_TABLE);
+    typename CONFIG_T::table_t real_val = (in_val > 0.0) ? (1.0 / in_val) : 0.0;
+    return real_val;
+}
+
+template <typename CONFIG_T, std::size_t N, std::size_t... I>
+constexpr static std::array<typename CONFIG_T::table_t, sizeof...(I)> init_invert_table_legacy(std::index_sequence<I...>) {
+    return std::array<typename CONFIG_T::table_t, sizeof...(I)>{compute_invert_fcn_float_index_legacy<CONFIG_T, N>(I)...};
+}
+
+template <typename CONFIG_T, std::size_t N>
+constexpr static std::array<typename CONFIG_T::table_t, N> init_invert_table_legacy() {
+    return init_invert_table_legacy<CONFIG_T, N>(std::make_index_sequence<N>{});
+}
+#endif
+
+// Runtime init functions (for backward compatibility with OLD_SOFTMAX_LEGACY)
+#ifdef OLD_SOFTMAX_LEGACY
 template <typename CONFIG_T, int N_TABLE> void init_exp_table_legacy(typename CONFIG_T::table_t table_out[N_TABLE]) {
     for (int ii = 0; ii < N_TABLE; ii++) {
         // First, convert from table index to X-value (signed 8-bit, range -8 to +8)
@@ -413,10 +452,13 @@ template <typename CONFIG_T, int N_TABLE> void init_invert_table_legacy(typename
             table_out[ii] = 0.0;
     }
 }
+#endif
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax_legacy(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]) {
-    // Initialize the lookup table
+    // Initialize the lookup tables
+#ifdef OLD_SOFTMAX_LEGACY
+    // Runtime initialization for backward compatibility
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::table_t exp_table[CONFIG_T::exp_table_size];
@@ -431,12 +473,19 @@ void softmax_legacy(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
         init_invert_table_legacy<CONFIG_T, CONFIG_T::inv_table_size>(invert_table);
         initialized = true;
     }
+#else
+    // Compile-time initialization (default)
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::exp_table_size> exp_table =
+        init_exp_table_legacy<CONFIG_T, CONFIG_T::exp_table_size>();
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::inv_table_size> invert_table =
+        init_invert_table_legacy<CONFIG_T, CONFIG_T::inv_table_size>();
+#endif
 
     //#pragma HLS PIPELINE
 
-    // Index into the lookup table based on data for exponentials
-    typename CONFIG_T::table_t exp_res[CONFIG_T::n_slice]; // different, independent, fixed point precision
-    typename CONFIG_T::table_t exp_diff_res;               // different, independent, fixed point precision
+    // [rest of softmax_legacy implementation remains the same]
+    typename CONFIG_T::table_t exp_res[CONFIG_T::n_slice];
+    typename CONFIG_T::table_t exp_diff_res;
     data_T data_cache[CONFIG_T::n_slice];
     int data_round;
     int index;
@@ -465,7 +514,6 @@ void softmax_legacy(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
         }
     }
 
-    // Second loop to invert
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_slice; ii++) {
         int exp_res_index = exp_res[ii] * CONFIG_T::inv_table_size / 64;
@@ -473,7 +521,6 @@ void softmax_legacy(data_T data[CONFIG_T::n_slice], res_T res[CONFIG_T::n_slice]
             exp_res_index = 0;
         if (exp_res_index > CONFIG_T::inv_table_size - 1)
             exp_res_index = CONFIG_T::inv_table_size - 1;
-        // typename CONFIG_T::table_t exp_res_invert = invert_table[exp_res_index];
         res[ii] = (res_T)invert_table[exp_res_index];
     }
 }

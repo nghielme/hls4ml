@@ -134,7 +134,7 @@ def keras_model_sepconv2d():
 @pytest.mark.parametrize('backend', ['Vivado', 'Vitis', 'Quartus', 'Bambu'])
 @pytest.mark.parametrize('model_type', ['conv1d', 'conv2d'])
 def test_auto_precision_conv(
-    keras_model_conv1d, keras_model_conv2d, data_2d, data_3d, model_type, io_type, backend, request
+    test_case_id, keras_model_conv1d, keras_model_conv2d, data_2d, data_3d, model_type, io_type, backend
 ):
     if model_type == 'conv1d':
         model = keras_model_conv1d
@@ -166,7 +166,7 @@ def test_auto_precision_conv(
         },
     }
 
-    odir = str(test_root_path / _pytest_case_id(request))
+    odir = str(test_root_path / test_case_id)
     input_data_tb = None
     output_data_tb = None
     y_keras = model.predict(data).flatten()
@@ -201,7 +201,7 @@ def test_auto_precision_conv(
 @pytest.mark.parametrize('backend', ['Vivado', 'Vitis'])  # No SeparableConv1D/2D in Quartus
 @pytest.mark.parametrize('model_type', ['sepconv1d', 'sepconv2d'])
 def test_auto_precision_sepconv(
-    keras_model_sepconv1d, keras_model_sepconv2d, data_2d, data_3d, model_type, io_type, backend, request
+    test_case_id, keras_model_sepconv1d, keras_model_sepconv2d, data_2d, data_3d, model_type, io_type, backend
 ):
     if model_type == 'sepconv1d':
         model = keras_model_sepconv1d
@@ -232,7 +232,8 @@ def test_auto_precision_sepconv(
             },
         },
     }
-    odir = str(test_root_path / _pytest_case_id(request))
+    
+    odir = str(test_root_path / test_case_id)
     input_data_tb = None
     output_data_tb = None
     y_keras = model.predict(data).flatten()
@@ -241,7 +242,6 @@ def test_auto_precision_sepconv(
         output_data_tb = test_root_path / f'tb_output_auto_{model_type}_{io_type}.npy'
         np.save(input_data_tb, data)
         np.save(output_data_tb, y_keras)
-
     hls_model = hls4ml.converters.convert_from_keras_model(
         model, hls_config=config, io_type=io_type, output_dir=odir, backend=backend,
         input_data_tb=str(input_data_tb) if input_data_tb is not None else None,
@@ -261,7 +261,7 @@ def test_auto_precision_sepconv(
 
 @pytest.mark.parametrize('io_type', ['io_stream', 'io_parallel'])
 @pytest.mark.parametrize('backend', ['Vivado', 'Vitis', 'Quartus'])
-def test_auto_precision_dense(keras_model_dense, data_1d, io_type, backend, request):
+def test_auto_precision_dense(test_case_id, keras_model_dense, data_1d, io_type, backend):
     model = keras_model_dense
     data = data_1d
 
@@ -287,7 +287,7 @@ def test_auto_precision_dense(keras_model_dense, data_1d, io_type, backend, requ
             },
         },
     }
-    odir = str(test_root_path / _pytest_case_id(request))
+    odir = str(test_root_path / test_case_id)
     input_data_tb = None
     output_data_tb = None
     y_keras = model.predict(data).flatten()
@@ -296,7 +296,6 @@ def test_auto_precision_dense(keras_model_dense, data_1d, io_type, backend, requ
         output_data_tb = test_root_path / f'tb_output_auto_{model_type}_{io_type}.npy'
         np.save(input_data_tb, data)
         np.save(output_data_tb, y_keras)
-
     hls_model = hls4ml.converters.convert_from_keras_model(
         model, hls_config=config, io_type=io_type, output_dir=odir, backend=backend,
         input_data_tb=str(input_data_tb) if input_data_tb is not None else None,

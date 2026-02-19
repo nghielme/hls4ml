@@ -46,8 +46,22 @@ def _pytest_case_id(request):
         # Result is likely to be different when |x| > 1 (see TF/Theano docs)
         (Activation('hard_sigmoid'), 'hard_sigmoid'),
     ],
+    ids=[
+        'relu',
+        'leaky_relu',
+        'leaky_relu_act',
+        'threshold_relu',
+        'elu',
+        'selu',
+        'prelu',
+        'softplus',
+        'softsign',
+        'tanh',
+        'sigmoid',
+        'hard_sigmoid',
+    ],
 )
-def test_activations(backend, activation, name, shape, io_type, request):
+def test_activations(test_case_id, backend, activation, name, shape, io_type):
     if name == 'prelu' and shape == (8, 8, 3):
         return
     # Subtract 0.5 to include negative values
@@ -68,7 +82,7 @@ def test_activations(backend, activation, name, shape, io_type, request):
         np.save(output_data_tb, keras_prediction)
 
     hls_config = hls4ml.utils.config_from_keras_model(keras_model, granularity='name', backend=backend)
-    output_dir = str(test_root_path / _pytest_case_id(request))
+    output_dir = str(test_root_path / test_case_id)
 
     hls_model = hls4ml.converters.convert_from_keras_model(
         keras_model,

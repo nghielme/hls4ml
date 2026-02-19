@@ -290,7 +290,9 @@ SoftmaxArrayLoop:
 
 template <class data_T, class res_T, typename CONFIG_T>
 void softmax_legacy(hls::stream<data_T> &data, hls::stream<res_T> &res) {
-    // Initialize the lookup table
+    // Initialize the lookup tables
+#ifdef OLD_SOFTMAX_LEGACY
+    // Keep old runtime initialization for backwards compatibility
 #ifdef __HLS_SYN__
     bool initialized = false;
     typename CONFIG_T::table_t exp_table[CONFIG_T::table_size];
@@ -305,6 +307,13 @@ void softmax_legacy(hls::stream<data_T> &data, hls::stream<res_T> &res) {
         init_invert_table_legacy<CONFIG_T, CONFIG_T::table_size>(invert_table);
         initialized = true;
     }
+#else
+    // Compile-time initialization (default)
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> exp_table =
+        init_exp_table_legacy<CONFIG_T, CONFIG_T::table_size>();
+    static constexpr const ::std::array<typename CONFIG_T::table_t, CONFIG_T::table_size> invert_table =
+        init_invert_table_legacy<CONFIG_T, CONFIG_T::table_size>();
+#endif
 
     // Index into the lookup table based on data for exponentials
     typename CONFIG_T::table_t exp_res[data_T::size];
