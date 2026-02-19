@@ -10,18 +10,6 @@ import hls4ml
 
 test_root_path = Path(__file__).parent
 
-
-def _pytest_case_id(request):
-    callspec = getattr(request.node, 'callspec', None)
-    if callspec is not None:
-        return callspec.id
-
-    node_name = request.node.name
-    if '[' in node_name and node_name.endswith(']'):
-        return node_name.split('[', 1)[1][:-1]
-
-    return node_name
-
 # Variable 'name' is simply used as an identifier for the activation
 
 
