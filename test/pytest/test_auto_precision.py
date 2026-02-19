@@ -21,18 +21,6 @@ from hls4ml.model.optimizer.passes.infer_precision import _get_precision_from_co
 
 test_root_path = Path(__file__).parent
 
-
-def _pytest_case_id(request):
-    callspec = getattr(request.node, 'callspec', None)
-    if callspec is not None:
-        return callspec.id
-
-    node_name = request.node.name
-    if '[' in node_name and node_name.endswith(']'):
-        return node_name.split('[', 1)[1][:-1]
-
-    return node_name
-
 in_height = 10
 in_width = 12
 in_feat = 4
