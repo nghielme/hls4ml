@@ -19,11 +19,11 @@ class VitisUnifiedConfig:
         if self.axi_mode not in ['axi_stream', 'axi_master']:
             raise Exception('AXIMode must be either axi_stream or axi_master')
 
+        # axi master buffer size
         # before first and after last layer we have the configurable buffer
         # [platform]<-->[in_stream_buf_size]<-->[hls]<-->[out_stream_buf_size]<-->[platform]
         self.in_stream_buf_size = self.config['VitisUnifiedConfig']['in_stream_buf_size']
         self.out_stream_buf_size = self.config['VitisUnifiedConfig']['out_stream_buf_size']
-
         # Platform is resolved from supported_boards.json based on board + axi_mode
         board_info = self.supported_boards.get(self.board, {})
         mode_config = board_info.get(self.axi_mode, {})
@@ -58,6 +58,7 @@ class VitisUnifiedConfig:
             raise Exception(f'Board "{self.board}" has no platform for axi_mode "{self.axi_mode}" in supported_boards.json.')
 
         self.driver = self.config['VitisUnifiedConfig']['Driver']
+        assert self.driver == 'python', 'we currently only support python drivers'
 
         # c++ type for input and output of the hls kernel it must be str (float/double)
         self.input_type = self.config['VitisUnifiedConfig']['InputDtype']
@@ -103,23 +104,22 @@ class VitisUnifiedConfig:
     def get_part(self):
         return self.get_board_info()['part']
 
+    # main driver generation
     def get_driver_file(self):
-        """Return driver filename for current board and axi_mode (from supported_boards)."""
+        """Return driver filename for current settings"""
         board_info = self.get_board_info()
-        drivers = board_info.get('python_drivers' if self.driver == 'python' else 'c_drivers', {})
-        return drivers.get(self.axi_mode)
-
-    def get_driver_template_path(self):
-        """Return absolute path to driver template for current board and axi_mode.
-
-        Derives path from python_drivers in supported_boards: {board}/python_drivers/{driver_file}.hls4ml
-        """
-        board_info = self.get_board_info()
-        driver_file = board_info.get('python_drivers', {}).get(self.axi_mode)
+        driver_file = board_info.get(self.axi_mode, {}).get('python_driver')
         if not driver_file:
             raise Exception(
                 f'No python_driver for axi_mode "{self.axi_mode}" in supported_boards.json for board "{self.board}"'
             )
+        return driver_file
+
+    def get_driver_template_path(self):
+        """Return absolute path to main driver template for current board.
+        Derives path from python_drivers in supported_boards: {board}/python_drivers/{driver_file}.hls4ml
+        """
+        driver_file = self.get_driver_file()
         template_rel = f'{self.board}/python_drivers/{driver_file}.hls4ml'
         return os.path.join(os.path.dirname(__file__), '../../templates/vitis_unified', template_rel)
 
