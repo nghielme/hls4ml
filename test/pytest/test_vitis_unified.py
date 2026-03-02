@@ -15,14 +15,9 @@ from tensorflow.keras.models import Model
 import hls4ml
 
 test_root_path = Path(__file__).parent
-# 1. For who installed the xilinx tool chain in /opt
-# os.environ['XILINX_VITIS'] = '/opt/Xilinx/Vitis/2023.2'
 
-# 2. For who installed the xilinx tool chain in /tools (both vitis and vivado are mandatory)
-os.environ['XILINX_VITIS'] = '/tools/Xilinx/Vitis/2023.2'
-os.environ['XILINX_VIVADO'] = '/tools/Xilinx/Vivado/2023.2'
-
-os.environ['PATH'] = os.environ['XILINX_VITIS'] + '/bin:' + os.environ['XILINX_VIVADO'] + '/bin:' + os.environ['PATH']
+os.environ['XILINX_VITIS'] = '/opt/Xilinx/Vitis/2023.2'
+os.environ['PATH'] = os.environ['XILINX_VITIS'] + '/bin:' + os.environ['PATH']
 
 
 @pytest.fixture(scope='module')
@@ -41,19 +36,15 @@ def simple_unet():
     return model
 
 
-part_map = {'zcu102': 'xczu9eg-ffvb1156-2-e', 'kv260': 'xck26-sfvc784-2LV-c'}
-
-
-def _vitis_unified_convert_kwargs(io_type, axi_mode, board='zcu102', **extra):
+def _vitis_unified_convert_kwargs(io_type, axi_mode, **extra):
     """Shared backend kwargs for VitisUnified conversion.
     Platform is resolved from supported_boards.json by board + axi_mode.
     """
-    part = part_map[board]
     return {
         'backend': 'VitisUnified',
         'io_type': io_type,
-        'board': board,
-        'part': part,
+        'board': 'zcu102',
+        'part': 'xczu9eg-ffvb1156-2-e',
         'clock_period': '10ns',
         'input_type': 'float',
         'output_type': 'float',
@@ -225,30 +216,21 @@ def test_fifo_depth(test_case_id, simple_unet, tmp_path, io_type, strategy, gran
 @pytest.mark.parametrize('io_type', ['io_stream'])
 @pytest.mark.parametrize('strategy', ['latency'])
 @pytest.mark.parametrize('granularity', ['name'])
-@pytest.mark.parametrize('batch_size', [10])
 @pytest.mark.parametrize('axi_mode', ['axi_stream', 'axi_master'])
-# @pytest.mark.parametrize('board', ['zcu102', 'kv260'])
-@pytest.mark.parametrize('board', ['kv260'])
-def test_gen_unified(test_case_id, simple_unet, io_type, strategy, granularity, batch_size, axi_mode, board):
+def test_gen_unified(test_case_id, simple_unet, io_type, strategy, granularity, axi_mode):
     model = simple_unet
-    X_input = np.random.rand(batch_size, 4, 4, 1).astype(np.float32)
 
     config = hls4ml.utils.config_from_keras_model(model, granularity=granularity)
     config['Model']['Strategy'] = strategy
-    test_case_id = test_case_id
     output_dir = str(test_root_path / test_case_id)
 
     vitis_unified_model = hls4ml.converters.convert_from_keras_model(
         model,
         hls_config=config,
         output_dir=output_dir,
-        **_vitis_unified_convert_kwargs(io_type, axi_mode, board),
+        **_vitis_unified_convert_kwargs(io_type, axi_mode),
     )
     vitis_unified_model.compile()
-    # predict and save for hardware comparison purpose
-    y_pred = vitis_unified_model.predict(X_input)
-    np.save(os.path.join(output_dir, 'x_input.npy'), X_input)
-    np.save(os.path.join(output_dir, 'y_pred_sw.npy'), y_pred)
     vitis_unified_model.build(synth=True, bitfile=True, log_to_stdout=True)
 
     export_dir = os.path.join(output_dir, 'export')
@@ -260,6 +242,3 @@ def test_gen_unified(test_case_id, simple_unet, io_type, strategy, granularity, 
     assert os.path.isdir(final_reports_dir), f'final_reports directory does not exist: {final_reports_dir}'
     rpt_files = [f for f in os.listdir(final_reports_dir) if f.endswith('.rpt')]
     assert len(rpt_files) > 0, f'No .rpt files found in final_reports directory: {final_reports_dir}'
-
-
-# test_gen_unified('axi_stream_debug_4', simple_unet(), 'io_stream', 'latency', 'name', 10, 'axi_stream', 'kv260')

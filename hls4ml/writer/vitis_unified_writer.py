@@ -64,15 +64,6 @@ class VitisUnifiedWriter(VitisWriter):
     def _get_top_wrap_func_name(self, model, is_axi_master):
         return self._get_wrapper_file_name(model, is_axi_master)
 
-    def _get_wrap_ip_name(self, model, is_axi_master):
-        return f'{self._get_top_wrap_func_name(model, is_axi_master)}_1'
-
-    def _get_interrupt_pin_name(self, model, is_axi_master):
-        if is_axi_master:
-            return f'{self._get_wrap_ip_name(model, True)}/interrupt'
-        else:
-            return f'{self._get_wrap_ip_name(model, False)}/s2mm_introut'
-
     def _get_xo_file_path(self, model):
         """Path to .xo relative to system_link (for link_system.sh)."""
         xo_name = f'{self._get_top_wrap_func_name(model, self._is_axi_master())}.xo'
@@ -327,7 +318,7 @@ fi
                             )
                             newline += indent + f'hls::stream<{self._get_dma_type_name()}> {out_stream};\n'
                             newline += indent + self._get_top_wrap_func_name(model, False) + '('
-                            newline += inp_stream + ', ' + out_stream + ', 1);\n'
+                            newline += inp_stream + ', ' + out_stream + ');\n'
                             newline += (
                                 indent + f'nnet::convert_data_axis<{dtype},{dtype}, N_OUT>({out_stream}, {out_func});\n'
                             )
@@ -388,9 +379,7 @@ fi
                         + indent
                         + '#pragma HLS INTERFACE axis port=axi_output_stream\n'
                         + indent
-                        + '#pragma HLS INTERFACE s_axilite port=return bundle=control\n'
-                        + indent
-                        + '#pragma HLS INTERFACE s_axilite port=batch_size bundle=control\n'
+                        + '#pragma HLS INTERFACE ap_ctrl_none port=return\n'
                     )
                 elif '// hls-fpga-machine-learning insert stream decl' in line:
                     in_depth = model.get_input_variables()[0].pragma[1]
@@ -545,7 +534,6 @@ fi
 
     # ===== Driver generation =====
     def write_driver(self, model):
-        # write the ip driver
         if self._is_axi_master():
             self._write_driver_axi_master(model)
         else:
@@ -558,12 +546,7 @@ fi
             open(driver_template_path) as fin,
             open(f'{model.config.get_output_dir()}/export/{driver_file}', 'w') as fout,
         ):
-            for line in fin.readlines():
-                if '<TOP_WRAPPER_NAME>' in line:
-                    line = line.replace('<TOP_WRAPPER_NAME>', self._get_wrap_ip_name(model, False))
-                if '<TOP_NAME>' in line:
-                    line = line.replace('<TOP_NAME>', self._get_top_wrap_func_name(model, False))
-                fout.write(line)
+            fout.write(fin.read())
 
     def _write_driver_axi_master(self, model):
         driver_template_path = self.vitis_unified_config.get_driver_template_path()
@@ -599,10 +582,8 @@ fi
                         ',\n'.join(self._gen_hex_addr_list(start_out_ptr_addr, stride_out_ptr_addr, len(outputs), indent))
                         + '\n'
                     )
-                if '<TOP_WRAPPER_NAME>' in line:
-                    line = line.replace('<TOP_WRAPPER_NAME>', self._get_wrap_ip_name(model, True))
                 if '<TOP_NAME>' in line:
-                    line = line.replace('<TOP_NAME>', self._get_top_wrap_func_name(model, True))
+                    line = line.replace('<TOP_NAME>', self._get_top_wrap_func_name(model, self._is_axi_master()))
                 fout.write(line)
 
     # ===== Test generation =====
@@ -662,7 +643,6 @@ fi
                     else:
                         input_ios.append('inputs')
                         output_ios.append('outputs')
-                        constant_ios.append('1')
 
                     all_vars = ' ,'.join(filter(None, [*input_ios, *output_ios, *bram_ios, *constant_ios]))
                     top_level = indent + f'{self._get_top_wrap_func_name(model, self._is_axi_master())}({all_vars});\n'
