@@ -82,19 +82,20 @@ partname_to_bambu = {
     # : "xc6vlx240t-1ff1156", 
 
     # 7-series
-    "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324-VVD", "family" : "Xilinx"}, # 7-series Artix! vsynth confirmed working, using as default for now
+    "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324", "family" : "Xilinx"}, # 7-series Artix! vsynth confirmed working, using as default for now
     # : "xc7vx330t-1ffg1157",
-    # : "xc7vx485t-2ffg1761-VVD",
-    # : "xc7vx690t-3ffg1930-VVD", 
+    # : "xc7vx485t-2ffg1761",
+    # : "xc7vx690t-3ffg1930", 
     # : "xc7z020-1clg484",
-    # : "xc7z020-1clg484-VVD", 
-    # : "xc7z020-1clg484-YOSYS-VVD", 
-    # : "xc7z045-2ffg900-VVD",
+    # : "xc7z020-1clg484-YOSYS", 
+    # : "xc7z045-2ffg900",
 
     # UltraScale / UltraScale+
-    # : "xcku060-3ffva1156-VVD", 
-    # : "xcu280-2Lfsvh2892-VVD", 
-    "xcu55c-fsvh2892-2L-e" : {"device_name" : "xcu55c-2Lfsvh2892-VVD", "family" : "Xilinx"}
+    # : "xcku060-3ffva1156", 
+    # : "xcu250-2Lfigd2104",
+    # : "xcu280-2Lfsvh2892", 
+    # : "xcu50-2fsvh2104",
+    "xcu55c-fsvh2892-2L-e" : {"device_name" : "xcu55c-2Lfsvh2892", "family" : "Xilinx"}
 }
 
 
