@@ -434,7 +434,8 @@ class BambuBackend(FPGABackend):
                         '-Ifirmware/ac_types',
                         '--compiler=I386_CLANG16',
                         '--generate-interface=INFER',
-                        '-v4'
+                        '-v4',
+                        '-m64'
                        ]
         CMD_ARGS      = []
         
@@ -442,10 +443,9 @@ class BambuBackend(FPGABackend):
 
         ### RESET ###
         bambu_output_patterns = [
-            f"*{project_name}*.cache", f"*{project_name}*.hw", f"*{project_name}*.ip_user_files", 
-            ".Xil", "vivado_reports", "HLS_output", f"*{project_name}*.xpr", "bambu_results_*.xml", 
-            "clockInfo.txt", f"{project_name}-*_tb.exe", f"{project_name}.v", "results.txt",
-            "simulate*.sh", "synthesize*.sh"            
+            "HLS_output", "panda-temp", "vivado_reports", "bambu_results*.xml", 
+            "evaluate*.sh", "memory_allocation*.xml" f"{project_name}-*_tb.exe", 
+            f"{project_name}.v", "results.txt", "synthesize*.sh", "panda_libtech.v"        
             ]
         matches = [p for pat in bambu_output_patterns for p in Path(project_dir).glob(pat)]
         is_dirty_directory = any(matches)
@@ -632,7 +632,7 @@ class BambuBackend(FPGABackend):
         """Aggregate final reports in one directory based on Part Family/Software used"""
         if family == 'Xilinx':
             return(
-                'src_root="HLS_output/Synthesis/vivado_flow"\n'
+                'src_root="HLS_output/xilinx/flow_backend"\n'
                 'dst_root="vivado_reports"\n'
                 'mkdir -p "$dst_root"\n'
                 'find "$src_root" -type f \( -iname "*.rpt" -o -iname "*.xml" \) -exec cp -p {} "$dst_root"/ \;'
