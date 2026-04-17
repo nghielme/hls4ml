@@ -34,6 +34,20 @@ if command -v "$APPIMAGE" >/dev/null 2>&1; then
     fi
 fi
 
+# If no Bambu AppImage: check for extracted AppImage (squashfs-root)
+if [ -z "$MOUNT_DIR" ]; then
+    BIN_PATH="$(which "$APPIMAGE" 2>/dev/null || true)"
+
+    if [ -n "$BIN_PATH" ]; then
+        APPDIR="$(dirname "$(dirname "$(dirname "$BIN_PATH")")")"
+
+        if [ -x "$APPDIR/usr/bin/clang++-16" ] || \
+           [ -x "$APPDIR/usr/compilers/clang-16/bin/clang++-16" ]; then
+            MOUNT_DIR="$APPDIR"
+        fi
+    fi
+fi
+
 # If Bambu provides Clang++-16, use it
 if [ -n "$MOUNT_DIR" ] && [ -x "$MOUNT_DIR/usr/bin/clang++-16" ]; then
     CC="$MOUNT_DIR/usr/bin/clang++-16"
