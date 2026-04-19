@@ -444,8 +444,8 @@ class BambuBackend(FPGABackend):
         ### RESET ###
         bambu_output_patterns = [
             "HLS_output", "panda-temp", "vivado_reports", "bambu_results*.xml", 
-            "evaluate*.sh", "memory_allocation*.xml" f"{project_name}-*_tb.exe", 
-            f"{project_name}.v", "results.txt", "synthesize*.sh", "panda_libtech.v"        
+            "evaluate*.sh", "memory_allocation*.xml", f"{project_name}-*_tb.exe", 
+            f"{project_name}.v", "results.txt", "synthesize*.sh", "panda_libtech.v", "*.mem"       
             ]
         matches = [p for pat in bambu_output_patterns for p in Path(project_dir).glob(pat)]
         is_dirty_directory = any(matches)
