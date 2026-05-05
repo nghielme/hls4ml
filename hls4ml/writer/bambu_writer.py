@@ -68,10 +68,17 @@ class BambuWriter(Writer):
 
         if write_txt_file:
             h_file.write('#ifndef __SYNTHESIS__\n')
-            h_file.write(var.definition_cpp() + ';\n')
+            # `static` (internal linkage) so each translation unit that
+            # includes this weight header gets its own private copy. With
+            # the BambuAccelerator wrapper inlining the layer pipeline,
+            # both myproject.cpp and myproject_float.cpp include
+            # parameters.h; without `static` they collide at link time
+            # ("multiple definition of `w2'").
+            h_file.write('static ' + var.definition_cpp() + ';\n')
             h_file.write('#else\n')
-
-        h_file.write(var.definition_cpp() + ' = {')
+            h_file.write('static const ' + var.definition_cpp() + ' = {')
+        else:
+            h_file.write(var.definition_cpp() + ' = {')
 
         # fill c++ array.
         # not including internal brackets for multidimensional case
