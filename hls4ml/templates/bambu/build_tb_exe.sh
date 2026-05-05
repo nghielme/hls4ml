@@ -48,15 +48,20 @@ if [ -z "$MOUNT_DIR" ]; then
     fi
 fi
 
-# If Bambu provides Clang++-16, use it
-if [ -n "$MOUNT_DIR" ] && [ -x "$MOUNT_DIR/usr/bin/clang++-16" ]; then
-    CC="$MOUNT_DIR/usr/bin/clang++-16"
-    echo "Found clang++-16 in Bambu AppImage usr/bin directory."
-elif [ -n "$MOUNT_DIR" ] && [ -x "$MOUNT_DIR/usr/compilers/clang-16/bin/clang++-16" ]; then
-   CC="$MOUNT_DIR/usr/compilers/clang-16/bin/clang++-16"
-   echo "Found clang++-16 in Bambu AppImage usr/compilers directory."
-else
-    echo "Bambu's clang++-16 not found. Using fallback compiler."
+# If Bambu provides Clang++-16, use it. The AppImage layout has changed
+# across releases (older versions ship clang++-16 under usr/bin/, newer ones
+# under usr/compilers/clang-16/bin/), so probe both known locations.
+CC=""
+if [ -n "$MOUNT_DIR" ]; then
+    for candidate in \
+        "$MOUNT_DIR/usr/compilers/clang-16/bin/clang++-16" \
+        "$MOUNT_DIR/usr/bin/clang++-16"
+    do
+        if [ -x "$candidate" ]; then CC="$candidate"; break; fi
+    done
+fi
+if [ -z "$CC" ]; then
+    echo "Bambu AppImage clang++-16 not detected. Using fallback compiler."
     CC="$FALLBACK_CC"
 fi
 
