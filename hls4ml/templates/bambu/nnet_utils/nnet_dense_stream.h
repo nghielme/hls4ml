@@ -20,10 +20,14 @@ void dense_wrapper(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
     CONFIG_T::template kernel<data_T, res_T, CONFIG_T>::dense(data, res, weights, biases);
 }
 
+// Weights/biases are reached through `CONFIG_T` rather than taken as
+// pointer-array parameters: Bambu's DATAFLOW scheduler binds array-pointer
+// parameters of sub-functions to internal `DF_bambu_*FO0` interfaces that
+// read zero at runtime, regardless of what the .mem init file contains.
+// CONFIG_T::weights / ::biases are compile-time-resolved class members,
+// so the callee inlines them correctly.
 template <class data_T, class res_T, typename CONFIG_T>
-void dense(hls::stream<data_T> &data_stream, hls::stream<res_T> &res_stream,
-           const typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
-           const typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
+void dense(hls::stream<data_T> &data_stream, hls::stream<res_T> &res_stream) {
     typename data_T::value_type data[CONFIG_T::n_in];
     #pragma HLS ARRAY_PARTITION variable=data complete
 
@@ -44,7 +48,8 @@ DataPrepare:
         }
     }
 
-    dense_wrapper<typename data_T::value_type, typename res_T::value_type, CONFIG_T>(data, res, weights, biases);
+    dense_wrapper<typename data_T::value_type, typename res_T::value_type, CONFIG_T>(
+        data, res, CONFIG_T::weights, CONFIG_T::biases);
 
 ResWrite:
     for (unsigned i_out = 0; i_out < CONFIG_T::n_out / res_T::size; i_out++) {

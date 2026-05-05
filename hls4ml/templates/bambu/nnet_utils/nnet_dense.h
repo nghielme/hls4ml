@@ -45,6 +45,18 @@ void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
     CONFIG_T::template kernel<data_T, res_T, CONFIG_T>::dense(data, res, weights, biases);
 }
 
+// Two-argument overload: weights/biases come from CONFIG_T (compile-time
+// resolved class members). The Bambu backend emitter calls this form so
+// the wrapper's DATAFLOW scope doesn't pass weights as runtime pointer
+// parameters — those bind to `DF_bambu_*FO0` interfaces that read zero
+// at runtime.
+template <class data_T, class res_T, typename CONFIG_T>
+void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out]) {
+    #pragma HLS inline
+    CONFIG_T::template kernel<data_T, res_T, CONFIG_T>::dense(
+        data, res, CONFIG_T::weights, CONFIG_T::biases);
+}
+
 template <class data_T, class res_T, typename CONFIG_T> class DenseLatency : public DenseKernel<data_T, res_T, CONFIG_T> {
   public:
     static void dense(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],

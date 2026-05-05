@@ -30,13 +30,19 @@ dense_config_template = """struct config{index} : nnet::dense_config {{
     typedef {bias_t.name} bias_t;
     typedef {weight_t.name} weight_t;
     typedef {index_t.name} index_t;
+    // Bind weights/biases compile-time on the config so the streaming
+    // `nnet::dense` can reach them without a runtime array-pointer
+    // parameter — Bambu DATAFLOW pointer params read as all-zero at
+    // runtime regardless of ROM contents.
+    static constexpr const weight_t *weights = {w};
+    static constexpr const bias_t *biases = {b};
     template<class data_T, class res_T, class CONFIG_T>
     using kernel = {dense_function}<data_T, res_T, CONFIG_T>;
     template<class x_T, class y_T>
     using product = nnet::product::{product_type}<x_T, y_T>;
 }};\n"""
 
-dense_function_template = 'nnet::dense<{input_t}, {output_t}, {config}>({input}, {output}, {w}, {b});'
+dense_function_template = 'nnet::dense<{input_t}, {output_t}, {config}>({input}, {output});'
 
 dense_include_list = ['nnet_utils/nnet_dense.h', 'nnet_utils/nnet_dense_compressed.h', 'nnet_utils/nnet_dense_stream.h']
 
@@ -53,6 +59,8 @@ class DenseConfigTemplate(LayerConfigTemplate):
         params['product_type'] = get_backend('bambu').product_type(
             node.get_input_variable().type.precision, node.get_weights('weight').type.precision
         )
+        params['w'] = node.get_weights('weight').name
+        params['b'] = node.get_weights('bias').name
 
         namespace = params['namespace']
 
@@ -85,9 +93,6 @@ class DenseFunctionTemplate(FunctionCallTemplate):
 
     def format(self, node):
         params = self._default_function_params(node)
-        params['w'] = node.get_weights('weight').name
-        params['b'] = node.get_weights('bias').name
-
         return self.template.format(**params)
 
     def match(self, node):
