@@ -11,8 +11,8 @@ namespace nnet {
 
 template <class data_T, class res_T, typename CONFIG_T>
 void dense_wrapper(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
-                   typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
-                   typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
+                   const typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
+                   const typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
     #pragma HLS inline recursive
     if (CONFIG_T::strategy == nnet::latency || CONFIG_T::strategy == nnet::distributed_arithmetic) {
         //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
@@ -22,8 +22,8 @@ void dense_wrapper(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
 
 template <class data_T, class res_T, typename CONFIG_T>
 void dense(hls::stream<data_T> &data_stream, hls::stream<res_T> &res_stream,
-           typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
-           typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
+           const typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
+           const typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
     typename data_T::value_type data[CONFIG_T::n_in];
     //#pragma HLS ARRAY_PARTITION variable=data complete
 
