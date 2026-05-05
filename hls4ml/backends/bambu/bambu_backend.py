@@ -9,8 +9,8 @@ from warnings import warn
 import numpy as np
 
 from hls4ml.backends import FPGABackend
-from hls4ml.backends.bambu.bambu_types import BambuArrayVariableConverter
-from hls4ml.backends.fpga.fpga_types import APTypeConverter, HLSTypeConverter
+from hls4ml.backends.bambu.bambu_types import BambuArrayVariableConverter, BambuHLSTypeConverter
+from hls4ml.backends.fpga.fpga_types import APTypeConverter
 from hls4ml.model.attributes import ChoiceAttribute, ConfigurableAttribute, TypeAttribute
 from hls4ml.model.flow import register_flow
 from hls4ml.model.layers import (
@@ -1122,7 +1122,7 @@ class BambuBackend(FPGABackend):
     def init_garnet(self, layer):
         reuse_factor = layer.attributes['reuse_factor']
 
-        var_converter = BambuArrayVariableConverter(type_converter=HLSTypeConverter(precision_converter=APTypeConverter()))
+        var_converter = BambuArrayVariableConverter(type_converter=BambuHLSTypeConverter(precision_converter=APTypeConverter()))
 
         # A bit controversial but we are going to set the partitioning of the input here
         in_layer = layer.model.graph[layer.inputs[0]]
