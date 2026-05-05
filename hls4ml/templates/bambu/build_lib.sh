@@ -56,7 +56,7 @@ elif [ -n "$MOUNT_DIR" ] && [ -x "$MOUNT_DIR/usr/compilers/clang-16/bin/clang++-
     CC="$MOUNT_DIR/usr/compilers/clang-16/bin/clang++-16"
     echo "Found clang++-16 in Bambu AppImage usr/compilers directory."
 else
-    echo "Bambu AppImage not detected. Using fallback compiler."
+    echo "Bambu's clang++-16 not found. Using fallback compiler."
     CC="$FALLBACK_CC"
 fi
 
