@@ -82,7 +82,7 @@ partname_to_bambu = {
     # : "xc6vlx240t-1ff1156", 
 
     # 7-series
-    "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324-VVD", "family" : "Xilinx"}, # 7-series Artix! vsynth confirmed working, using as default for now
+    "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324", "family" : "Xilinx"}, # 7-series Artix; matches the entry in Bambu's `Available devices` listing
     # : "xc7vx330t-1ffg1157",
     # : "xc7vx485t-2ffg1761-VVD",
     # : "xc7vx690t-3ffg1930-VVD", 
@@ -94,7 +94,7 @@ partname_to_bambu = {
     # UltraScale / UltraScale+
     # : "xcku060-3ffva1156-VVD", 
     # : "xcu280-2Lfsvh2892-VVD", 
-    "xcu55c-fsvh2892-2L-e" : {"device_name" : "xcu55c-2Lfsvh2892-VVD", "family" : "Xilinx"}
+    "xcu55c-fsvh2892-2L-e" : {"device_name" : "xcu55c-2Lfsvh2892", "family" : "Xilinx"}
 }
 
 
@@ -479,8 +479,18 @@ class BambuBackend(FPGABackend):
         if cosim:
             if not synth:
                 raise ValueError("To run RTL cosimulation, C/RTL synthesis must be run.")
-            # --simulator=<SIMULATOR> will be selected by default by Bambu
             CMD_ARGS += [f'--generate-tb={self._get_cosim_testbench(project_name)}', '--simulate', '-DRTL_SIM']
+
+            # Force Verilator for NanoXplore parts. Bambu's default
+            # simulator selection picks a NanoXplore-native flow whose
+            # XML device files fail to parse on the current toolchain
+            # (`Error during XML parsing of device files`). Verilator is
+            # toolchain-agnostic and works for cosim regardless of the
+            # target FPGA family.
+            part_name = model.config.get_config_value('Part')
+            family = partname_to_bambu.get(part_name, {}).get("family", None)
+            if family == 'NanoXplore':
+                CMD_ARGS += ['--simulator=VERILATOR']
 
         ### VALIDATION ###
         if validation:
@@ -639,11 +649,15 @@ class BambuBackend(FPGABackend):
     def _final_report_copying_code(self, family):
         """Aggregate final reports in one directory based on Part Family/Software used"""
         if family == 'Xilinx':
+            # Bambu's Vivado-flow output directory has moved across releases
+            # (`HLS_output/Synthesis/vivado_flow` in older versions,
+            # `HLS_output/xilinx/flow_backend` in current). Search the full
+            # HLS_output tree so the script keeps working across versions.
             return(
-                'src_root="HLS_output/Synthesis/vivado_flow"\n'
+                'src_root="HLS_output"\n'
                 'dst_root="vivado_reports"\n'
                 'mkdir -p "$dst_root"\n'
-                'find "$src_root" -type f \( -iname "*.rpt" -o -iname "*.xml" \) -exec cp -p {} "$dst_root"/ \;'
+                r'find "$src_root" -type f \( -iname "*.rpt" -o -iname "*.xml" \) -exec cp -p {} "$dst_root"/ \;'
             )
         else: # TODO: Add more parsing code for different families/softwares
             return ""

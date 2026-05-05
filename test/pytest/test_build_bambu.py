@@ -181,14 +181,17 @@ def test_vsynth(test_case_id, simple_model, io_type, strategy, granularity, back
         output_dir=str(vsynth_proj_dir),
         io_type=io_type,
         backend=backend,
-        part=part
+        part=part,
+        clock_period=25,
     )
     hls_model.build(csim=False, synth=True, cosim=True, vsynth=True)
 
     # Bambu-specific artifact checks
     if backend in ('Bambu', 'BambuAccelerator'):
-        # Ensure we get bambu results file
-        assert sum(1 for _ in vsynth_proj_dir.rglob("bambu_results_*.xml")) >= 1
+        # Ensure we get bambu results file. Older Bambu versions produced
+        # `bambu_results_<flow>.xml`; current versions produce
+        # `bambu_results.xml` — match both.
+        assert sum(1 for _ in vsynth_proj_dir.rglob("bambu_results*.xml")) >= 1
 
         # Ensure we get expected reports
         if hls_model.config.get_config_value('FPGAFamily') == 'Xilinx':
