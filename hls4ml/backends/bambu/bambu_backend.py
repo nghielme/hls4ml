@@ -420,10 +420,7 @@ class BambuBackend(FPGABackend):
         part_family = model.config.get_config_value("FPGAFamily")
 
         # Bambu-specific command/flags
-        BASE_COMMAND  = ['bambu', 
-                         os.path.join('firmware', f'{project_name}.cpp'), 
-                         f'--top-fname={project_name}'
-                        ]
+        BASE_COMMAND = ['bambu'] + self._get_hls_sources(project_name) + [f'--top-fname={self._get_top_fname(project_name)}']
         # `-ftemplate-depth=2048` is forwarded by Bambu directly to its
         # clang-16 front-end. The default 1024-deep template instantiation
         # limit is hit by `std::make_index_sequence<N>` in libstdc++ 4.9.4
@@ -503,7 +500,7 @@ class BambuBackend(FPGABackend):
             if not synth:
                 raise ValueError("To run RTL cosimulation, C/RTL synthesis must be run.")
             # --simulator=<SIMULATOR> will be selected by default by Bambu
-            CMD_ARGS += [f'--generate-tb={project_name}_test.cpp', '--simulate', '-DRTL_SIM']
+            CMD_ARGS += [f'--generate-tb={self._get_cosim_testbench(project_name)}', '--simulate', '-DRTL_SIM']
 
         ### VALIDATION ###
         if validation:
@@ -633,7 +630,19 @@ class BambuBackend(FPGABackend):
             result.update(parse_bambu_report(project_dir, part_family))
 
             return result
-        
+
+    def _get_hls_sources(self, project_name):
+        """Return the list of C++ source files to pass to Bambu."""
+        return [os.path.join('firmware', f'{project_name}.cpp')]
+
+    def _get_top_fname(self, project_name):
+        """Return the top-level function name for Bambu synthesis."""
+        return project_name
+
+    def _get_cosim_testbench(self, project_name):
+        """Return the testbench filename for Bambu RTL co-simulation."""
+        return f'{project_name}_test.cpp'
+
     def _build_testbench_exe(self, model):
         ret = subprocess.run(
             ['bash', 'build_tb_exe.sh'],
