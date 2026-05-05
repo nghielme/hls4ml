@@ -19,6 +19,13 @@ config_filename = 'hls4ml_config.yml'
 class BambuWriter(Writer):
     _ARRAY_PARTITION_PRAGMA_RE = re.compile(r'^(\s*)(?://\s*)?(#pragma\s+HLS\s+array_partition\b.*)$', re.IGNORECASE)
 
+    # Whether the top-level core function should emit its own
+    # `#pragma HLS interface` lines. A subclass that wraps this core inside
+    # a different top-level (and owns the AXI/AXIS interface there) sets
+    # this to False so InterfaceInfer doesn't see two competing
+    # declarations on the same port.
+    _emit_core_interface_pragmas = True
+
     @staticmethod
     def _env_flag_enabled(name, default):
         value = os.environ.get(name)
@@ -245,18 +252,40 @@ class BambuWriter(Writer):
             # Add input/output type
             elif '// hls-fpga-machine-learning insert IO' in line:
                 newline = line
-                all_inputs = [i.name for i in model_inputs]
-                all_outputs = [o.name for o in model_outputs]
                 all_brams = [b.name for b in model_brams]
                 io_type = model.config.get_config_value('IOType')
 
                 pipeline_style = model.config.pipeline_style
                 pipeline_ii = model.config.pipeline_ii
-                pipeline_pragma = indent + f'//#pragma HLS {pipeline_style.upper()}'
+                # PIPELINE stays commented out: Bambu's default II=1 isn't
+                # achievable for the layer pipeline (`Function pipelining
+                # not possible with II=1`, observed minII=2 maxII=4).
+                # DATAFLOW (io_stream) IS activated — io_stream layers need
+                # it to flow concurrently as separate tasks.
+                pragma_prefix = '//' if pipeline_style == 'pipeline' else ''
+                pipeline_pragma = indent + f'{pragma_prefix}#pragma HLS {pipeline_style.upper()}'
                 if pipeline_style == 'pipeline' and pipeline_ii is not None:
                     pipeline_pragma += f' II={pipeline_ii}\n'
                 else:
                     pipeline_pragma += '\n'
+
+                # Per-port `#pragma HLS interface` directives. Two changes
+                # vs. the old comma-list form:
+                #   - io_parallel emits NOTHING. Current Bambu rejects
+                #     `mode=valid` as "Invalid HLS interface mode"; the
+                #     valid-handshake interface is derived by
+                #     `--generate-interface=INFER` from the typed array
+                #     parameters in the function signature.
+                #   - io_stream emits one `mode=axis` line per port (Bambu
+                #     requires explicit AXIS pragmas; the comma-list form
+                #     is rejected by current InterfaceInfer).
+                # `_emit_core_interface_pragmas = False` suppresses the
+                # io_stream emission for a subclass that wraps this core
+                # in a different top-level and owns the interface there.
+                interface_pragmas = ''
+                if self._emit_core_interface_pragmas and io_type == 'io_stream':
+                    for port in [i.name for i in model_inputs] + [o.name for o in model_outputs]:
+                        interface_pragmas += f'{indent}#pragma HLS interface mode=axis port={port}\n'
 
                 if io_type == 'io_parallel':
                     for i in model_inputs:
@@ -265,26 +294,10 @@ class BambuWriter(Writer):
                     for o in model_outputs:
                         if self._should_emit_array_partition_pragma():
                             newline += indent + self._make_array_pragma(o) + '\n'
-                    # Two fixes for Bambu's pragma parser (clang-16 plugin):
-                    #   1. Emit one pragma per port instead of a single
-                    #      comma-separated port list. Bambu's parser does not
-                    #      accept `port=in1,in2` syntax.
-                    #   2. Use `#pragma HLS_interface ...` (underscore form)
-                    #      rather than `#pragma HLS interface ...`. The space
-                    #      form is parsed by the strict mode-validation path
-                    #      which rejects `mode=valid` with
-                    #      `error: Invalid HLS interface mode`. The underscore
-                    #      form goes through the lenient parser and is
-                    #      accepted, while still letting --generate-interface=INFER
-                    #      build the correct interface from the signature.
-                    for port in all_inputs + all_outputs:
-                        newline += indent + '#pragma HLS_interface mode=valid port={}\n'.format(port)
                     newline += pipeline_pragma
 
                 if io_type == 'io_stream':
-                    newline += indent + '#pragma HLS interface mode=axis port={},{} \n'.format(
-                        ','.join(all_inputs), ','.join(all_outputs)
-                    )
+                    newline += interface_pragmas
                     if all_brams:
                         newline += indent + '//#pragma HLS INTERFACE bram port={} \n'.format(','.join(all_brams))
                     newline += pipeline_pragma
