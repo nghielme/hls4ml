@@ -38,74 +38,48 @@
 
 #include "ac_channel.h"
 
-namespace hls
-{
-   template <typename T, int DEPTH = 0>
-   class stream : public ac_channel<T>
-   {
-    public:
-      using element_type = T;
-      using base_type = ac_channel<T>;
+namespace hls {
+template <typename T, int DEPTH = 0> class stream : public ac_channel<T> {
+  public:
+    using element_type = T;
+    using base_type = ac_channel<T>;
 
-      stream() : base_type()
-      {
-      }
+    stream() : base_type() {}
 
-      stream(const char*) : base_type()
-      {
-      }
+    stream(const char *) : base_type() {}
 
 #if !defined(__BAMBU__) || defined(__BAMBU_SIM__)
-   stream(const stream<T>&) = default;
-   stream(int init) : ac_channel<T>(init){}
-   stream(int init, T val): ac_channel<T>(init, val){}
-   stream(std::initializer_list<T> val) : ac_channel<T>(val) {}
-   stream& operator=(const stream<T>&) = default;
+    stream(const stream<T, DEPTH> &) = default;
+    stream(int init) : ac_channel<T>(init) {}
+    stream(int init, T val) : ac_channel<T>(init, val) {}
+    stream(std::initializer_list<T> val) : ac_channel<T>(val) {}
+    stream &operator=(const stream<T, DEPTH> &) = default;
 #endif
 
+    virtual ~stream() = default;
 
-      virtual ~stream() = default;
+    void operator>>(T &rdata) { this->read(rdata); }
 
-      void operator>>(T& rdata)
-      {
-         this->read(rdata);
-      }
+    void operator<<(const T &wdata) { this->write(wdata); }
 
-      void operator<<(const T& wdata)
-      {
-         this->write(wdata);
-      }
+    bool full() { return DEPTH == 0 ? false : (DEPTH == this->size()); }
 
-      bool full()
-      {
-         return DEPTH == 0 ? false : (DEPTH == this->size());
-      }
+    bool read_nb(T &head) { return this->nb_read(head); }
 
-      bool read_nb(T& head)
-      {
-         return this->nb_read(head);
-      }
+    bool write_nb(T &tail) { return this->nb_write(tail); }
 
-      bool write_nb(T& tail)
-      {
-         return this->nb_write(tail);
-      }
+    bool write_nb(const T &tail) {
+        T tail_copy = tail;
+        return write_nb(tail_copy);
+    }
 
-      bool write_nb(const T& tail)
-      {
-         T tail_copy = tail;
-         return write_nb(tail_copy);
-      }
+    void set_name(const char *) {}
 
-      void set_name(const char*)
-      {
-      }
-
-    private:
+  private:
 #if defined(__BAMBU__) && !defined(__BAMBU_SIM__)
-      stream(const stream&) = delete;
-      stream& operator=(const stream&) = delete;
+    stream(const stream &) = delete;
+    stream &operator=(const stream &) = delete;
 #endif
-   };
+};
 } // namespace hls
 #endif
