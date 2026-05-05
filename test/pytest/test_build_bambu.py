@@ -35,7 +35,7 @@ def count_files_with_extension(directory, extension):
 @pytest.mark.parametrize('strategy', ['latency'])
 @pytest.mark.parametrize('granularity', ['name'])
 @pytest.mark.parametrize('batch_size', [10])
-@pytest.mark.parametrize('backend', ['Vitis', 'Bambu'])
+@pytest.mark.parametrize('backend', ['Vitis', 'Bambu', 'BambuAccelerator'])
 def test_csimulation(test_case_id, simple_model, tmp_path, io_type, strategy, granularity, batch_size, backend):
     output_dir = str(test_root_path / test_case_id)
 
@@ -81,7 +81,7 @@ def test_csimulation(test_case_id, simple_model, tmp_path, io_type, strategy, gr
 @pytest.mark.parametrize('strategy', ['latency'])
 @pytest.mark.parametrize('granularity', ['name'])
 @pytest.mark.parametrize('batch_size', [10])
-@pytest.mark.parametrize('backend', ['Vitis', 'Bambu'])
+@pytest.mark.parametrize('backend', ['Vitis', 'Bambu', 'BambuAccelerator'])
 def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, granularity, batch_size, backend):
     output_dir = str(test_root_path / test_case_id)
 
@@ -126,7 +126,7 @@ def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, g
 @pytest.mark.parametrize('io_type', ['io_parallel'])
 @pytest.mark.parametrize('strategy', ['latency'])
 @pytest.mark.parametrize('granularity', ['name'])
-@pytest.mark.parametrize('backend', ['Vitis', 'Bambu'])
+@pytest.mark.parametrize('backend', ['Vitis', 'Bambu', 'BambuAccelerator'])
 def test_synth(test_case_id, simple_model, io_type, strategy, granularity, backend):
     """Test that a successful synth run produces the desired artifacts (.v file)"""
     synth_proj_dir = test_root_path / test_case_id
@@ -146,11 +146,13 @@ def test_synth(test_case_id, simple_model, io_type, strategy, granularity, backe
     hls_model.build(csim=False, synth=True)
 
     # Bambu-specific artifact checks
-    if backend == 'Bambu':
-        # Ensure we get bambu results file
+    if backend in ('Bambu', 'BambuAccelerator'):
+        # Ensure we get bambu results file. The accelerator wraps the core
+        # in a `_float`-suffixed top-level, so its top-level Verilog carries
+        # that suffix.
         proj_name = hls_model.config.get_project_name()
-        assert Path(synth_proj_dir, f'{proj_name}.v').exists()
-
+        suffix = '_float' if backend == 'BambuAccelerator' else ''
+        assert Path(synth_proj_dir, f'{proj_name}{suffix}.v').exists()
 
     # TODO: Vitis-specific artifact checks
 
@@ -158,10 +160,13 @@ def test_synth(test_case_id, simple_model, io_type, strategy, granularity, backe
 @pytest.mark.parametrize('io_type', ['io_parallel'])
 @pytest.mark.parametrize('strategy', ['latency'])
 @pytest.mark.parametrize('granularity', ['name'])
-@pytest.mark.parametrize('backend', ['Vitis', 'Bambu'])
-def test_vsynth(test_case_id, simple_model, io_type, strategy, granularity, backend):
+@pytest.mark.parametrize('backend', ['Vitis', 'Bambu', 'BambuAccelerator'])
+@pytest.mark.parametrize('part', ['nx2h540tsc', 'xc7a100tcsg324-1'])
+def test_vsynth(test_case_id, simple_model, io_type, strategy, granularity, backend, part):
     """Test that a successful vsynth run produces the desired reports.
-    Uses 7-Series Artix part "xc7a100tcsg324-1" to synthesize in Vivado.
+    Sweeps a NanoXplore (`nx2h540tsc`) and a 7-Series Artix
+    (`xc7a100tcsg324-1`) target so the Bambu flow is exercised on both
+    target families.
     """
     vsynth_proj_dir = test_root_path / test_case_id
 
@@ -176,12 +181,12 @@ def test_vsynth(test_case_id, simple_model, io_type, strategy, granularity, back
         output_dir=str(vsynth_proj_dir),
         io_type=io_type,
         backend=backend,
-        part='xc7a100tcsg324-1'
+        part=part
     )
     hls_model.build(csim=False, synth=True, cosim=True, vsynth=True)
 
     # Bambu-specific artifact checks
-    if backend == 'Bambu':
+    if backend in ('Bambu', 'BambuAccelerator'):
         # Ensure we get bambu results file
         assert sum(1 for _ in vsynth_proj_dir.rglob("bambu_results_*.xml")) >= 1
 
