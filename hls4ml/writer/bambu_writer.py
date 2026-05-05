@@ -16,6 +16,13 @@ config_filename = 'hls4ml_config.yml'
 
 
 class BambuWriter(Writer):
+    # Whether the top-level core function should emit its own
+    # `#pragma HLS interface` lines. A subclass that wraps this core inside
+    # a different top-level (and owns the AXI/AXIS interface there) sets
+    # this to False so InterfaceInfer doesn't see two competing
+    # declarations on the same port.
+    _emit_core_interface_pragmas = True
+
     def print_array_to_cpp(self, var, odir, namespace=None, write_txt_file=True):
         """Write a weights array to C++ header files.
 
@@ -198,35 +205,50 @@ class BambuWriter(Writer):
             # Add input/output type
             elif '// hls-fpga-machine-learning insert IO' in line:
                 newline = line
-                all_inputs = [i.name for i in model_inputs]
-                all_outputs = [o.name for o in model_outputs]
                 all_brams = [b.name for b in model_brams]
                 io_type = model.config.get_config_value('IOType')
 
                 pipeline_style = model.config.pipeline_style
                 pipeline_ii = model.config.pipeline_ii
-                pipeline_pragma = indent + f'//#pragma HLS {pipeline_style.upper()}'
+                # PIPELINE stays commented out: Bambu's default II=1 isn't
+                # achievable for the layer pipeline (`Function pipelining
+                # not possible with II=1`, observed minII=2 maxII=4).
+                # DATAFLOW (io_stream) IS activated — io_stream layers need
+                # it to flow concurrently as separate tasks.
+                pragma_prefix = '//' if pipeline_style == 'pipeline' else ''
+                pipeline_pragma = indent + f'{pragma_prefix}#pragma HLS {pipeline_style.upper()}'
                 if pipeline_style == 'pipeline' and pipeline_ii is not None:
                     pipeline_pragma += f' II={pipeline_ii}\n'
                 else:
                     pipeline_pragma += '\n'
+
+                # Per-port `#pragma HLS interface` directives. Two changes
+                # vs. the old comma-list form:
+                #   - io_parallel emits NOTHING. Current Bambu rejects
+                #     `mode=valid` as "Invalid HLS interface mode"; the
+                #     valid-handshake interface is derived by
+                #     `--generate-interface=INFER` from the typed array
+                #     parameters in the function signature.
+                #   - io_stream emits one `mode=axis` line per port (Bambu
+                #     requires explicit AXIS pragmas; the comma-list form
+                #     is rejected by current InterfaceInfer).
+                # `_emit_core_interface_pragmas = False` suppresses the
+                # io_stream emission for a subclass that wraps this core
+                # in a different top-level and owns the interface there.
+                interface_pragmas = ''
+                if self._emit_core_interface_pragmas and io_type == 'io_stream':
+                    for port in [i.name for i in model_inputs] + [o.name for o in model_outputs]:
+                        interface_pragmas += f'{indent}#pragma HLS interface mode=axis port={port}\n'
 
                 if io_type == 'io_parallel':
                     for i in model_inputs:
                         newline += indent + self._make_array_pragma(i) + '\n'
                     for o in model_outputs:
                         newline += indent + self._make_array_pragma(o) + '\n'
-                    # TODO discussed adding a handle for setting the interface mode for individual input and output arrays
-                    # Probably the handle doesn't need to be exposed to the user but should be just set in hls_model.py
-                    newline += indent + '#pragma HLS interface mode=valid port={},{} \n'.format(
-                        ','.join(all_inputs), ','.join(all_outputs)
-                    )
                     newline += pipeline_pragma
 
                 if io_type == 'io_stream':
-                    newline += indent + '#pragma HLS interface mode=axis port={},{} \n'.format(
-                        ','.join(all_inputs), ','.join(all_outputs)
-                    )
+                    newline += interface_pragmas
                     if all_brams:
                         newline += indent + '//#pragma HLS INTERFACE bram port={} \n'.format(','.join(all_brams))
                     newline += pipeline_pragma
