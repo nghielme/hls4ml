@@ -121,6 +121,109 @@ class BambuWriter(Writer):
         elif mode == 'stream':
             return f'//#pragma HLS STREAM variable={variable.name} depth={depth}'
 
+    # Helpers reused by `write_project_cpp` and (in a forthcoming subclass)
+    # by a wrapper writer that emits a different top-level function around
+    # this core. The first three are consumed below; the last three
+    # (`_emit_core_*`) are forward-looking infrastructure for the wrapper.
+
+    def _emit_load_weights_block(self, model, indent='    '):
+        """Emit the `#ifndef __BAMBU__` weight-loading block; '' if disabled."""
+        if not model.config.get_writer_config()['WriteWeightsTxt']:
+            return ''
+        out = '#ifndef __BAMBU__\n'
+        out += f'{indent}static bool loaded_weights = false;\n'
+        out += f'{indent}if (!loaded_weights) {{\n'
+        for layer in model.get_layers():
+            for w in layer.get_weights():
+                if w.weight_class == 'CompressedWeightVariable':
+                    out += indent + '    nnet::load_compressed_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
+                        w.type.name, w.nonzeros, w.name, w.name
+                    )
+                elif w.weight_class == 'ExponentWeightVariable':
+                    out += indent + '    nnet::load_exponent_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
+                        w.type.name, w.data_length, w.name, w.name
+                    )
+                else:
+                    out += indent + '    nnet::load_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
+                        w.type.name, w.data_length, w.name, w.name
+                    )
+        out += '        loaded_weights = true;'
+        out += '    }\n'
+        out += '#endif'
+        return out
+
+    def _emit_internal_stream_decls(self, model, indent='    '):
+        """Emit declarations for every non-input/output per-layer variable.
+
+        Bambu's DATAFLOW requires every local stream to be declared before
+        any sub-function call in the top-function body, so they live in the
+        same block as the layer calls.
+        """
+        model_inputs = model.get_input_variables()
+        model_outputs = model.get_output_variables()
+        out = ''
+        for layer in model.get_layers():
+            for var in layer.get_variables():
+                if var in model_inputs or var in model_outputs:
+                    continue
+                def_cpp = var.definition_cpp()
+                if def_cpp is None:
+                    continue
+                out += f'{indent}{def_cpp};\n'
+                if var.pragma:
+                    out += f'{indent}{self._make_array_pragma(var)}\n\n'
+        return out
+
+    def _emit_layer_calls(self, model, indent='    '):
+        """Emit the per-layer `function_cpp` calls."""
+        out = ''
+        for layer in model.get_layers():
+            func = layer.get_attr('function_cpp', None)
+            if not func:
+                continue
+            if not isinstance(func, (list, set)):
+                func = [func]
+            if len(func) == 1:
+                out += f'{indent}{func[0]} // {layer.name}\n'
+            else:
+                out += f'{indent}// {layer.name}\n'
+                for entry in func:
+                    out += f'{indent}{entry}\n'
+            if model.config.trace_output and layer.get_attr('trace', False):
+                out += '#ifndef __SYNTHESIS__\n'
+                for var in layer.get_variables():
+                    out += '{}nnet::save_layer_output<{}>({}, "{}", {});\n'.format(
+                        indent, var.type.name, var.name, layer.name, var.size_cpp()
+                    )
+                out += '#endif\n'
+            out += '\n'
+        return out
+
+    def _emit_core_io_pragma(self, model, indent='    '):
+        """Return `#pragma HLS DATAFLOW` for io_stream, empty otherwise.
+
+        Used by a wrapper top-level that calls into this core: the wrapper's
+        DATAFLOW pragma is what makes the per-layer streams flow concurrently.
+        """
+        io_type = model.config.get_config_value('IOType')
+        if io_type != 'io_stream':
+            return ''
+        return f'{indent}#pragma HLS DATAFLOW\n'
+
+    def _emit_core_input_declarations(self, model, indent='    '):
+        """Emit local declarations for each model input variable."""
+        out = ''
+        for inp in model.get_input_variables():
+            out += f'{indent}{inp.definition_cpp()};\n'
+        return out
+
+    def _emit_core_output_declarations(self, model, indent='    '):
+        """Emit local declarations for each model output variable."""
+        out = ''
+        for o in model.get_output_variables():
+            out += f'{indent}{o.definition_cpp()};\n'
+        return out
+
     def write_project_cpp(self, model):
         """Write the main architecture source file (myproject.cpp)
 
@@ -171,36 +274,7 @@ class BambuWriter(Writer):
                     newline += '}\n'
 
             elif '// hls-fpga-machine-learning insert load weights' in line:
-                newline = line
-                if model.config.get_writer_config()['WriteWeightsTxt']:
-                    newline += '#ifndef __BAMBU__\n'
-                    newline += '    static bool loaded_weights = false;\n'
-                    newline += '    if (!loaded_weights) {\n'
-
-                    for layer in model.get_layers():
-                        for w in layer.get_weights():
-                            if w.weight_class == 'CompressedWeightVariable':
-                                newline += (
-                                    indent
-                                    + '    nnet::load_compressed_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
-                                        w.type.name, w.nonzeros, w.name, w.name
-                                    )
-                                )
-                            elif w.weight_class == 'ExponentWeightVariable':
-                                newline += (
-                                    indent
-                                    + '    nnet::load_exponent_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
-                                        w.type.name, w.data_length, w.name, w.name
-                                    )
-                                )
-                            else:
-                                newline += indent + '    nnet::load_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
-                                    w.type.name, w.data_length, w.name, w.name
-                                )
-
-                    newline += '        loaded_weights = true;'
-                    newline += '    }\n'
-                    newline += '#endif'
+                newline = line + self._emit_load_weights_block(model)
 
             # Add input/output type
             elif '// hls-fpga-machine-learning insert IO' in line:
@@ -255,35 +329,8 @@ class BambuWriter(Writer):
 
             elif '// hls-fpga-machine-learning insert layers' in line:
                 newline = line + '\n'
-                for layer in model.get_layers():
-                    vars = layer.get_variables()
-                    for var in vars:
-                        if var not in model_inputs and var not in model_outputs:
-                            def_cpp = var.definition_cpp()
-                            if def_cpp is not None:
-                                newline += '    ' + def_cpp + ';\n'
-                                if var.pragma:
-                                    newline += '    ' + self._make_array_pragma(var) + '\n\n'
-                for layer in model.get_layers():
-                    func = layer.get_attr('function_cpp', None)
-                    if func:
-                        if not isinstance(func, (list, set)):
-                            func = [func]
-                        if len(func) == 1:
-                            newline += '    ' + func[0] + ' // ' + layer.name + '\n'
-                        else:
-                            newline += '    // ' + layer.name + '\n'
-                            for line in func:
-                                newline += '    ' + line + '\n'
-                        if model.config.trace_output and layer.get_attr('trace', False):
-                            vars = layer.get_variables()
-                            newline += '#ifndef __SYNTHESIS__\n'
-                            for var in vars:
-                                newline += '    nnet::save_layer_output<{}>({}, "{}", {});\n'.format(
-                                    var.type.name, var.name, layer.name, var.size_cpp()
-                                )
-                            newline += '#endif\n'
-                        newline += '\n'
+                newline += self._emit_internal_stream_decls(model)
+                newline += self._emit_layer_calls(model)
 
             # Just copy line
             else:
