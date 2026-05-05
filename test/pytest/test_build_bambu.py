@@ -77,7 +77,7 @@ def test_csimulation(test_case_id, simple_model, tmp_path, io_type, strategy, gr
     assert np.allclose(bridge_result, csim_result, rtol=0.0, atol=1e-4)
 
 
-@pytest.mark.parametrize('io_type', ['io_parallel'])
+@pytest.mark.parametrize('io_type', ['io_parallel', 'io_stream'])
 @pytest.mark.parametrize('strategy', ['latency'])
 @pytest.mark.parametrize('granularity', ['name'])
 @pytest.mark.parametrize('batch_size', [10])
@@ -123,7 +123,7 @@ def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, g
     assert np.allclose(bridge_result, cosim_result, rtol=0.0, atol=1e-4)
 
 
-@pytest.mark.parametrize('io_type', ['io_parallel'])
+@pytest.mark.parametrize('io_type', ['io_parallel', 'io_stream'])
 @pytest.mark.parametrize('strategy', ['latency'])
 @pytest.mark.parametrize('granularity', ['name'])
 @pytest.mark.parametrize('backend', ['Vitis', 'Bambu', 'BambuAccelerator'])
