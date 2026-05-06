@@ -494,6 +494,19 @@ class BambuBackend(FPGABackend):
                 raise RuntimeError(
                 f'C++ testbench execution failed:\nSTDOUT:\n{ret.stdout}\nSTDERR:\n{ret.stderr}'
             )
+                
+        if synth:
+            clock_period = model.config.get_config_value('ClockPeriod')
+            part_name = model.config.get_config_value('Part') # Bambu uses its own 'device name' which does NOT always coincide with part name
+            device_name = partname_to_bambu.get(part_name, {}).get("device_name", None)
+            if device_name is None:
+                warn(
+                    f"WARNING: Part name {part_name} has no registered mapping to a Bambu --device-name. "
+                    f"Using '--device-name={part_name}'. "
+                    "(See valid Bambu device names by running Bambu with High Verbosity flag '-v4')"
+                )
+                device_name = part_name
+            CMD_ARGS += [f'--device-name={device_name}', f'--clock-period={clock_period}']
             
         ### COSIM ###
         if cosim:
@@ -528,18 +541,7 @@ class BambuBackend(FPGABackend):
             if not cosim:
                 raise ValueError("To synthesize for specific part in Bambu, RTL cosimulation must be run.")
 
-            clock_period = model.config.get_config_value('ClockPeriod')
-            part_name = model.config.get_config_value('Part') # Bambu uses its own 'device name' which does NOT always coincide with part name
-            device_name = partname_to_bambu.get(part_name, {}).get("device_name", None)
-            if device_name is None:
-                warn(
-                    f"WARNING: Part name {part_name} has no registered mapping to a Bambu --device-name. "
-                    f"Using '--device-name={part_name}'. "
-                    "(See valid Bambu device names by running Bambu with High Verbosity flag '-v4')"
-                )
-                device_name = part_name
-
-            CMD_ARGS += ['--evaluation', f'--device-name={device_name}', f'--clock-period={clock_period}']
+            CMD_ARGS += ['--evaluation']
             
         ### FIFO_OPT ### 
         if fifo_opt:

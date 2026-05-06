@@ -82,7 +82,8 @@ def test_csimulation(test_case_id, simple_model, tmp_path, io_type, strategy, gr
 @pytest.mark.parametrize('granularity', ['name'])
 @pytest.mark.parametrize('batch_size', [10])
 @pytest.mark.parametrize('backend', ['Vitis', 'Bambu', 'BambuAccelerator'])
-def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, granularity, batch_size, backend):
+@pytest.mark.parametrize('part', ['nx2h540tsc', 'xc7a100tcsg324-1'])
+def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, granularity, batch_size, backend, part):
     output_dir = str(test_root_path / test_case_id)
 
     model = simple_model
@@ -96,13 +97,15 @@ def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, g
         hls_config=config,
         output_dir=output_dir,
         io_type=io_type,
-        backend=backend
+        backend=backend,
+        part=part,
+        clock_period=20,
     )
     hls_model.compile()
     y_pred = hls_model.predict(X_input)
 
-    input_data_tb = str(tmp_path / 'input.npy')
-    output_data_tb = str(tmp_path / 'output.npy')
+    input_data_tb = str(os.path.join(output_dir, 'input.npy'))
+    output_data_tb = str(os.path.join(output_dir, 'output.npy'))
     np.save(input_data_tb, X_input)
     np.save(output_data_tb, y_pred)
 
@@ -113,7 +116,9 @@ def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, g
         io_type=io_type,
         backend=backend,
         input_data_tb=input_data_tb,
-        output_data_tb=output_data_tb
+        output_data_tb=output_data_tb,
+        part=part,
+        clock_period=20,
     )
     hls_model_cosim.compile()
     hls_model_cosim.build(csim=False, synth=True, cosim=True, log_to_stdout=True)
