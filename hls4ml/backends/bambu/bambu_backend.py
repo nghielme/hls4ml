@@ -91,10 +91,11 @@ partname_to_bambu = {
     # : "xc7z045-2ffg900",
 
     # UltraScale / UltraScale+
-    # : "xcku060-3ffva1156", 
+    # : "xcku060-3ffva1156",
     # : "xcu250-2Lfigd2104",
-    # : "xcu280-2Lfsvh2892", 
+    # : "xcu280-2Lfsvh2892",
     # : "xcu50-2fsvh2104",
+    "xczu7ev-ffvc1156-2-e" : {"device_name" : "xczu7ev-2ffvc1156", "family" : "Xilinx"},
     "xcu55c-fsvh2892-2L-e" : {"device_name" : "xcu55c-2Lfsvh2892", "family" : "Xilinx"}
 }
 
