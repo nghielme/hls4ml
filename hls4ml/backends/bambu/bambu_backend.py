@@ -82,19 +82,20 @@ partname_to_bambu = {
     # : "xc6vlx240t-1ff1156", 
 
     # 7-series
-    "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324-VVD", "family" : "Xilinx"}, # 7-series Artix! vsynth confirmed working, using as default for now
+    "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324", "family" : "Xilinx"}, # 7-series Artix! vsynth confirmed working, using as default for now
     # : "xc7vx330t-1ffg1157",
-    # : "xc7vx485t-2ffg1761-VVD",
-    # : "xc7vx690t-3ffg1930-VVD", 
+    # : "xc7vx485t-2ffg1761",
+    # : "xc7vx690t-3ffg1930", 
     # : "xc7z020-1clg484",
-    # : "xc7z020-1clg484-VVD", 
-    # : "xc7z020-1clg484-YOSYS-VVD", 
-    # : "xc7z045-2ffg900-VVD",
+    # : "xc7z020-1clg484-YOSYS", 
+    # : "xc7z045-2ffg900",
 
     # UltraScale / UltraScale+
-    # : "xcku060-3ffva1156-VVD", 
-    # : "xcu280-2Lfsvh2892-VVD", 
-    "xcu55c-fsvh2892-2L-e" : {"device_name" : "xcu55c-2Lfsvh2892-VVD", "family" : "Xilinx"}
+    # : "xcku060-3ffva1156", 
+    # : "xcu250-2Lfigd2104",
+    # : "xcu280-2Lfsvh2892", 
+    # : "xcu50-2fsvh2104",
+    "xcu55c-fsvh2892-2L-e" : {"device_name" : "xcu55c-2Lfsvh2892", "family" : "Xilinx"}
 }
 
 
@@ -433,7 +434,8 @@ class BambuBackend(FPGABackend):
                         '-Ifirmware/ac_types',
                         '--compiler=I386_CLANG16',
                         '--generate-interface=INFER',
-                        '-v4'
+                        '-v4',
+                        '-m64'
                        ]
         CMD_ARGS      = []
         
@@ -441,10 +443,9 @@ class BambuBackend(FPGABackend):
 
         ### RESET ###
         bambu_output_patterns = [
-            f"*{project_name}*.cache", f"*{project_name}*.hw", f"*{project_name}*.ip_user_files", 
-            ".Xil", "vivado_reports", "HLS_output", f"*{project_name}*.xpr", "bambu_results_*.xml", 
-            "clockInfo.txt", f"{project_name}-*_tb.exe", f"{project_name}.v", "results.txt",
-            "simulate*.sh", "synthesize*.sh"            
+            "HLS_output", "panda-temp", "vivado_reports", "bambu_results*.xml", 
+            "evaluate*.sh", "memory_allocation*.xml", f"{project_name}-*_tb.exe", 
+            f"{project_name}.v", "results.txt", "synthesize*.sh", "panda_libtech.v", "*.mem"       
             ]
         matches = [p for pat in bambu_output_patterns for p in Path(project_dir).glob(pat)]
         is_dirty_directory = any(matches)
@@ -631,7 +632,7 @@ class BambuBackend(FPGABackend):
         """Aggregate final reports in one directory based on Part Family/Software used"""
         if family == 'Xilinx':
             return(
-                'src_root="HLS_output/Synthesis/vivado_flow"\n'
+                'src_root="HLS_output/xilinx/flow_backend"\n'
                 'dst_root="vivado_reports"\n'
                 'mkdir -p "$dst_root"\n'
                 'find "$src_root" -type f \( -iname "*.rpt" -o -iname "*.xml" \) -exec cp -p {} "$dst_root"/ \;'

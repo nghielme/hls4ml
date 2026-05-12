@@ -19,7 +19,7 @@ test_root_path = Path(__file__).parent
 def simple_model():
     """Simple Keras model for build testing"""
     model = Sequential()
-    model.add(Dense(3, input_shape=(2,)))
+    model.add(Dense(8, input_shape=(2,)))
     return model
 
 def count_files_with_extension(directory, extension):
@@ -116,7 +116,7 @@ def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, g
         output_data_tb=output_data_tb
     )
     hls_model_cosim.compile()
-    hls_model_cosim.build(synth=True, cosim=True, log_to_stdout=True)
+    hls_model_cosim.build(csim=False, synth=True, cosim=True, log_to_stdout=True)
 
     bridge_result = np.loadtxt(os.path.join(output_dir, 'tb_data', 'tb_output_predictions.dat'))
     cosim_result = np.loadtxt(os.path.join(output_dir, 'tb_data', 'rtl_cosim_results.log'))
@@ -183,7 +183,7 @@ def test_vsynth(test_case_id, simple_model, io_type, strategy, granularity, back
     # Bambu-specific artifact checks
     if backend == 'Bambu':
         # Ensure we get bambu results file
-        assert sum(1 for _ in vsynth_proj_dir.rglob("bambu_results_*.xml")) >= 1
+        assert sum(1 for _ in vsynth_proj_dir.rglob("bambu_results*.xml")) >= 1
 
         # Ensure we get expected reports
         if hls_model.config.get_config_value('FPGAFamily') == 'Xilinx':

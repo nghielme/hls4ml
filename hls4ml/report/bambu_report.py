@@ -7,31 +7,51 @@ from hls4ml.report.vivado_report import _parse_power_report, _parse_implementati
 def _coerce_value(raw):
     if raw is None:
         return None
-    raw = raw.strip()
-    if not raw:
-        return raw
+    if isinstance(raw, str):
+        raw = raw.strip()
+        if not raw:
+            return raw
     try:
         return int(raw)
-    except ValueError:
+    except (ValueError, TypeError):
         try:
             return float(raw)
-        except ValueError:
+        except (ValueError, TypeError):
             return raw
 
 
 def _parse_result_file(path):
     tree = ET.parse(path)
     root = tree.getroot()
+
     meta = {
-        'Args': root.attrib.get('bambu_args'),
-        'Version': root.attrib.get('bambu_version'),
+        'Args':      root.attrib.get('args'),
+        'Version':   root.attrib.get('version'),
         'Timestamp': root.attrib.get('timestamp'),
-        'Benchmark': root.attrib.get('benchmark_name'),
-        'File': os.path.basename(path),
+        'Benchmark': root.attrib.get('benchmark'),
+        'File':      os.path.basename(path),
     }
+
     metrics = {}
-    for node in root:
-        metrics[node.tag] = _coerce_value(node.attrib.get('value'))
+
+    # --- Resource metrics (REGISTERS, SLACK, LUTS, etc.) ---
+    resources = root.find('resources')
+    if resources is not None:
+        for key, val in resources.attrib.items():
+            metrics[key] = _coerce_value(val)
+
+    # --- Timing / simulation metrics ---
+    # <timing><evaluation return_value="0"><run>X</run></evaluation></timing>
+    timing = root.find('timing')
+    if timing is not None:
+        evaluation = timing.find('evaluation')
+        if evaluation is not None:
+            runs = [_coerce_value(r.text) for r in evaluation.findall('run')]
+            if runs:
+                metrics['Total cycles']         = sum(runs)
+                metrics['Number of executions'] = len(runs)
+                metrics['Average execution']    = sum(runs) / len(runs)
+
     return {'meta': meta, 'metrics': metrics}
 
 
