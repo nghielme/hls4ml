@@ -11,7 +11,7 @@ template <typename data_T, typename res_T, typename CONFIG_T>
 typename std::enable_if<CONFIG_T::dims == 2, void>::type transpose(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     #pragma HLS inline recursive
     typename data_T::value_type data_array[CONFIG_T::N];
-    //#pragma HLS ARRAY_PARTITION variable=data_array complete
+    #pragma HLS ARRAY_PARTITION variable=data_array complete
 
     for (int i = 0; i < CONFIG_T::N / data_T::size; i++) {
         //#pragma HLS PIPELINE
@@ -42,7 +42,7 @@ template <typename data_T, typename res_T, typename CONFIG_T>
 typename std::enable_if<CONFIG_T::dims != 2, void>::type transpose(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     #pragma HLS inline recursive
     typename data_T::value_type data_array[CONFIG_T::N];
-    //#pragma HLS ARRAY_PARTITION variable=data_array complete
+    #pragma HLS ARRAY_PARTITION variable=data_array complete
 
     for (int i = 0; i < CONFIG_T::N / data_T::size; i++) {
         //#pragma HLS PIPELINE

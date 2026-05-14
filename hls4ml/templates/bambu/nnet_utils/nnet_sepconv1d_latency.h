@@ -18,16 +18,16 @@ void depthwise_conv_1d_latency_cl(data_T data[CONFIG_T::in_width * CONFIG_T::n_c
     constexpr unsigned mult_n_out = CONFIG_T::n_filt;
 
     data_T data_buf[CONFIG_T::n_pixels][mult_n_in];
-    //#pragma HLS ARRAY_PARTITION variable=data_buf complete dim=0
+    #pragma HLS ARRAY_PARTITION variable=data_buf complete dim=0
 
     typename CONFIG_T::accum_t mult[mult_n_in];
-    //#pragma HLS ARRAY_PARTITION variable=mult complete
+    #pragma HLS ARRAY_PARTITION variable=mult complete
 
     typename CONFIG_T::accum_t acc[mult_n_out];
-    //#pragma HLS ARRAY_PARTITION variable=acc complete
+    #pragma HLS ARRAY_PARTITION variable=acc complete
 
-    //#pragma HLS ARRAY_PARTITION variable=weights complete
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=weights complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
     // Limit multipliers to control parallelization
     //#pragma HLS ALLOCATION operation instances=mul limit=CONFIG_T::mult_config::multiplier_limit

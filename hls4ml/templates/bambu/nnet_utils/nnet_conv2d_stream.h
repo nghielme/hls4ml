@@ -40,14 +40,14 @@ void conv_2d_encoded_cl(
         //#pragma HLS STREAM variable=data_window[i_out] depth=win_depth
     }
 
-    //#pragma HLS ARRAY_PARTITION variable=CONFIG_T::pixels complete
+    #pragma HLS ARRAY_PARTITION variable=CONFIG_T::pixels complete
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
     unsigned outputs_ready = 0;
 
     ap_uint<CONFIG_T::filt_height * CONFIG_T::filt_width> pixel_idx[data_T::size / CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=pixel_idx complete
+    #pragma HLS ARRAY_PARTITION variable=pixel_idx complete
 
 ReadInputHeight:
     for (unsigned i_ih = 0; i_ih < CONFIG_T::in_height; i_ih++) {
@@ -75,7 +75,7 @@ void conv_2d_buffer_cl(
 
     static ap_shift_reg<typename data_T::value_type, CONFIG_T::in_width> line_buffer[MAX(CONFIG_T::filt_height - 1, 1)]
                                                                                     [CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable = line_buffer complete dim = 2
+    #pragma HLS ARRAY_PARTITION variable = line_buffer complete dim = 2
 
     if (CONFIG_T::strategy == nnet::resource_unrolled && CONFIG_T::reuse_factor > 1) {
         //#pragma HLS allocation instances=compute_output_buffer_1d limit=1 function

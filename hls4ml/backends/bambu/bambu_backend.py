@@ -424,9 +424,26 @@ class BambuBackend(FPGABackend):
                          os.path.join('firmware', f'{project_name}.cpp'), 
                          f'--top-fname={project_name}'
                         ]
+        # `-ftemplate-depth=2048` is forwarded by Bambu directly to its
+        # clang-16 front-end. The default 1024-deep template instantiation
+        # limit is hit by `std::make_index_sequence<N>` in libstdc++ 4.9.4
+        # (the libstdc++ shipped inside Bambu's AppImage) when N == 1024,
+        # which is exactly the upper bound `core_templates.py` clamps
+        # softmax's `exp_table_size` to. The recursive index-tuple builder
+        # at `bits/utility:215` in that libstdc++ requires N levels of
+        # depth, so any softmax whose input `data_T` width is >= 10 (e.g.
+        # `ap_fixed<16,6>` or a dense accumulator like `ac_fixed<18,10>`)
+        # trips the limit and the front-end aborts with `recursive template
+        # instantiation exceeded maximum depth of 1024`. Raising the
+        # ceiling is the fix the compiler error itself suggests, and is
+        # harmless for the smaller cases (no extra runtime/memory cost).
+        # See firmware/nnet_utils/nnet_activation.h:228 in hls4ml's bambu
+        # templates for the actual `make_index_sequence` call site.
+        CC_TEMPLATE_DEPTH = '-ftemplate-depth=2048'
         if os.environ.get('USE_BAMBU_AC_TYPES'):
             REQ_ARGS = ['-lm',
                         '--compiler=I386_CLANG16',
+                        CC_TEMPLATE_DEPTH,
                         '--generate-interface=INFER',
                         '-v4'
                        ]
@@ -434,6 +451,7 @@ class BambuBackend(FPGABackend):
             REQ_ARGS = ['-lm', 
                         '-Ifirmware/ac_types',
                         '--compiler=I386_CLANG16',
+                        CC_TEMPLATE_DEPTH,
                         '--generate-interface=INFER',
                         '-v4',
                         '-m64'

@@ -16,9 +16,9 @@ void depthwise_mult_buffer(hls::stream<typename data_T::value_type> data_window[
     #pragma HLS inline
 
     typename data_T::value_type data[CONFIG_T::kernel_size * CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=data complete
+    #pragma HLS ARRAY_PARTITION variable=data complete
     typename res_T::value_type res[CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=res complete
+    #pragma HLS ARRAY_PARTITION variable=res complete
 
 InitData:
     #pragma clang loop unroll(full)
@@ -90,10 +90,10 @@ void pointwise_mult_buffer(const data_T &data_pack, hls::stream<res_T> &res_stre
     #pragma HLS inline
 
     typename data_T::value_type data[CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=data complete
+    #pragma HLS ARRAY_PARTITION variable=data complete
 
     typename res_T::value_type res[CONFIG_T::n_filt];
-    //#pragma HLS ARRAY_PARTITION variable=res complete
+    #pragma HLS ARRAY_PARTITION variable=res complete
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -134,10 +134,10 @@ void compute_depthwise_output_buffer_1d(const data_T &in_elem, hls::stream<res_T
     static int sX = 0;
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_width * CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=kernel_data complete
+    #pragma HLS ARRAY_PARTITION variable=kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=res_out complete dim = 0
+    #pragma HLS ARRAY_PARTITION variable=res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -196,10 +196,10 @@ void compute_depthwise_output_buffer_2d(const data_T &in_elem,
     static int sY = 0; // stride Y
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_height * CONFIG_T::filt_width * CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=kernel_data complete
+    #pragma HLS ARRAY_PARTITION variable=kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=res_out complete dim = 0
+    #pragma HLS ARRAY_PARTITION variable=res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)

@@ -69,12 +69,12 @@ void compute_pool_encoded_2d(
     #pragma HLS inline
 
     if (data_T::size / CONFIG_T::n_filt > 1) {
-        //#pragma HLS ARRAY_PARTITION variable=pool_table_height complete
-        //#pragma HLS ARRAY_PARTITION variable=pool_table_width complete
+        #pragma HLS ARRAY_PARTITION variable=pool_table_height complete
+        #pragma HLS ARRAY_PARTITION variable=pool_table_width complete
     }
 
     typename CONFIG_T::accum_t pool_window[CONFIG_T::pool_height * CONFIG_T::pool_width];
-    //#pragma HLS ARRAY_PARTITION variable=pool_window complete
+    #pragma HLS ARRAY_PARTITION variable=pool_window complete
 
     const unsigned sh_idx = pool_table_height[h_idx] * CONFIG_T::pool_width;
     const unsigned wp_idx = w_idx * (data_T::size / CONFIG_T::n_filt);
@@ -176,10 +176,10 @@ void compute_pool_buffer_2d(const data_T &in_elem,
     static int sY = 0; // stride Y
 
     typename CONFIG_T::accum_t pool_window[CONFIG_T::pool_height * CONFIG_T::pool_width];
-    //#pragma HLS ARRAY_PARTITION variable=pool_window complete
+    #pragma HLS ARRAY_PARTITION variable=pool_window complete
 
     static typename data_T::value_type kernel_data[CONFIG_T::pool_height * CONFIG_T::pool_width * CONFIG_T::n_filt];
-    //#pragma HLS ARRAY_PARTITION variable = kernel_data complete dim = 0
+    #pragma HLS ARRAY_PARTITION variable = kernel_data complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -235,7 +235,7 @@ void pooling2d_buffer_cl(hls::stream<data_T> &data, hls::stream<res_T> &res) {
 
     static ap_shift_reg<typename data_T::value_type, CONFIG_T::in_width> line_buffer[MAX(CONFIG_T::pool_height - 1, 1)]
                                                                                     [CONFIG_T::n_filt];
-    //#pragma HLS ARRAY_PARTITION variable = line_buffer complete dim = 2
+    #pragma HLS ARRAY_PARTITION variable = line_buffer complete dim = 2
 
 ReadInputHeight:
     for (unsigned i_ih = 0; i_ih < CONFIG_T::in_height; i_ih++) {
@@ -292,11 +292,11 @@ void compute_pool_encoded_1d(const unsigned w_idx, const data_T &in_elem,
     #pragma HLS inline
 
     if (data_T::size / CONFIG_T::n_filt > 1) {
-        //#pragma HLS ARRAY_PARTITION variable=pool_table_width complete
+        #pragma HLS ARRAY_PARTITION variable=pool_table_width complete
     }
 
     typename CONFIG_T::accum_t pool_window[CONFIG_T::pool_width];
-    //#pragma HLS ARRAY_PARTITION variable=pool_window complete
+    #pragma HLS ARRAY_PARTITION variable=pool_window complete
 
     const unsigned wp_idx = w_idx * (data_T::size / CONFIG_T::n_filt);
 
@@ -384,10 +384,10 @@ void compute_pool_buffer_1d(const data_T &in_elem, hls::stream<res_T> &res) {
     static int sX = 0;
 
     typename CONFIG_T::accum_t pool_window[CONFIG_T::pool_width];
-    //#pragma HLS ARRAY_PARTITION variable=pool_window complete
+    #pragma HLS ARRAY_PARTITION variable=pool_window complete
 
     static typename data_T::value_type kernel_data[CONFIG_T::pool_width * CONFIG_T::n_filt];
-    //#pragma HLS ARRAY_PARTITION variable = kernel_data complete dim = 0
+    #pragma HLS ARRAY_PARTITION variable = kernel_data complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -478,7 +478,7 @@ PoolFilt:
         //#pragma HLS UNROLL
 
         typename CONFIG_T::accum_t data_pack[data_T::size / CONFIG_T::n_filt];
-        //#pragma HLS ARRAY_PARTITION variable=data_pack complete dim=0
+        #pragma HLS ARRAY_PARTITION variable=data_pack complete dim=0
 
     PixelLoop:
         #pragma clang loop unroll(full)
@@ -497,7 +497,7 @@ void global_pooling2d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     assert(CONFIG_T::pool_height == CONFIG_T::stride_height && CONFIG_T::pool_width == CONFIG_T::stride_width);
 
     typename CONFIG_T::accum_t data_window[CONFIG_T::n_filt];
-    //#pragma HLS ARRAY_PARTITION variable=data_window complete
+    #pragma HLS ARRAY_PARTITION variable=data_window complete
 
     typename CONFIG_T::accum_t init = 0;
     if (CONFIG_T::pool_op == Max) {
@@ -560,7 +560,7 @@ void global_pooling1d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     assert(CONFIG_T::pool_width == CONFIG_T::stride_width);
 
     typename CONFIG_T::accum_t data_window[CONFIG_T::n_filt];
-    //#pragma HLS ARRAY_PARTITION variable=data_window complete
+    #pragma HLS ARRAY_PARTITION variable=data_window complete
 
     typename CONFIG_T::accum_t init = 0;
     if (CONFIG_T::pool_op == Max) {

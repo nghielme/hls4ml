@@ -27,7 +27,7 @@ void embedding(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in * CONFIG_T:
     //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
     // This can save a few cycles, but it will create a large multiplexer due to
     // non-constant access pattern, so let's leave it out
-    //#pragma HLS ARRAY_PARTITION variable=embeddings complete
+    #pragma HLS ARRAY_PARTITION variable=embeddings complete
 
 InputSequence:
     #pragma clang loop unroll(full)

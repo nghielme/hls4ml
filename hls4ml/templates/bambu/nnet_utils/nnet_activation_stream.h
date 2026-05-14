@@ -153,7 +153,7 @@ void softmax_latency(hls::stream<data_T> &data, hls::stream<res_T> &res) {
 
     // Calculate all the e^x's
     typename CONFIG_T::accum_t exp_res[data_T::size];
-    //#pragma HLS array_partition variable=exp_res complete
+    #pragma HLS array_partition variable=exp_res complete
     typename CONFIG_T::inv_inp_t exp_sum(0);
 SoftmaxExpLoop:
     for (unsigned i = 0; i < CONFIG_T::n_in / data_T::size; i++) {
@@ -233,7 +233,7 @@ void softmax_stable(hls::stream<data_T> &data, hls::stream<res_T> &res) {
     constexpr unsigned ii = data_T::size / multiplier_limit;
 
     typename data_T::value_type data_array[data_T::size];
-//#pragma HLS ARRAY_PARTITION variable=data_array complete
+#pragma HLS ARRAY_PARTITION variable=data_array complete
 SoftmaxArrayLoop:
     for (unsigned i = 0; i < CONFIG_T::n_in / data_T::size; i++) {
         //#pragma HLS PIPELINE II=ii
@@ -258,7 +258,7 @@ SoftmaxArrayLoop:
 
         // Calculate all the e^x's
         typename CONFIG_T::accum_t exp_res[data_T::size];
-        //#pragma HLS ARRAY_PARTITION variable=exp_res complete
+        #pragma HLS ARRAY_PARTITION variable=exp_res complete
         typename CONFIG_T::inv_inp_t exp_sum(0);
         #pragma clang loop unroll(full)
         for (unsigned j = 0; j < data_T::size; j++) {
@@ -482,7 +482,7 @@ TanHActLoop:
 template <class data_T, class res_T, typename CONFIG_T>
 void unary_lut(hls::stream<data_T> &data, hls::stream<res_T> &res, typename CONFIG_T::table_t table[CONFIG_T::table_size]) {
     //#pragma HLS function_instantiate variable=table
-    //#pragma HLS ARRAY_PARTITION variable=table complete
+    #pragma HLS ARRAY_PARTITION variable=table complete
 
 UnaryLUTActLoop:
     for (int i = 0; i < CONFIG_T::n_in / res_T::size; i++) {

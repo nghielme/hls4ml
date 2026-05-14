@@ -25,10 +25,10 @@ void dense(hls::stream<data_T> &data_stream, hls::stream<res_T> &res_stream,
            typename CONFIG_T::weight_t weights[CONFIG_T::n_in * CONFIG_T::n_out],
            typename CONFIG_T::bias_t biases[CONFIG_T::n_out]) {
     typename data_T::value_type data[CONFIG_T::n_in];
-    //#pragma HLS ARRAY_PARTITION variable=data complete
+    #pragma HLS ARRAY_PARTITION variable=data complete
 
     typename res_T::value_type res[CONFIG_T::n_out];
-    //#pragma HLS ARRAY_PARTITION variable=res complete
+    #pragma HLS ARRAY_PARTITION variable=res complete
 
 DataPrepare:
     for (int i_in = 0; i_in < CONFIG_T::n_in / data_T::size; i_in++) {
