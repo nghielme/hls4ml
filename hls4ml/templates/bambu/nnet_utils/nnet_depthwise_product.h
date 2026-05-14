@@ -17,7 +17,7 @@ void depthwise_product_latency(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::
 
     //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor
 
-    //#pragma HLS ARRAY_PARTITION variable=mult complete
+    #pragma HLS ARRAY_PARTITION variable=mult complete
 
     //#pragma HLS ALLOCATION operation instances=mul limit=CONFIG_T::multiplier_limit
 
@@ -74,10 +74,10 @@ void depthwise_product_resource_rf_leq_nout(data_T data[CONFIG_T::n_in], res_T r
     //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
     //#pragma HLS ARRAY_RESHAPE   variable=data block factor=block_factor
 
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
     typename CONFIG_T::accum_t acc[nout];
-    //#pragma HLS ARRAY_PARTITION variable=acc complete
+    #pragma HLS ARRAY_PARTITION variable=acc complete
 
 InitAccum:
     #pragma clang loop unroll(full)
@@ -138,10 +138,10 @@ void depthwise_product_resource_rf_gt_nout_rem0(data_T data[CONFIG_T::n_in], res
     //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
     //#pragma HLS ARRAY_RESHAPE   variable=data block factor=block_factor
 
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
     typename CONFIG_T::accum_t acc[nout];
-    //#pragma HLS ARRAY_PARTITION variable=acc complete
+    #pragma HLS ARRAY_PARTITION variable=acc complete
 
 InitAccum:
     #pragma clang loop unroll(full)
@@ -206,10 +206,10 @@ void depthwise_product_resource_gt_nout(data_T data[CONFIG_T::n_in], res_T res[C
     //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
     //#pragma HLS ARRAY_RESHAPE   variable=data block factor=block_factor
 
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
     typename CONFIG_T::accum_t acc[nout];
-    //#pragma HLS ARRAY_PARTITION variable=acc complete
+    #pragma HLS ARRAY_PARTITION variable=acc complete
 
 InitAccum:
     #pragma clang loop unroll(full)

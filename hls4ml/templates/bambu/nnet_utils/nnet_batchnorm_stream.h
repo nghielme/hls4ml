@@ -15,8 +15,8 @@ namespace nnet {
 template <class data_T, class res_T, typename CONFIG_T>
 void normalize(hls::stream<data_T> &data, hls::stream<res_T> &res, typename CONFIG_T::scale_t scale[CONFIG_T::n_scale_bias],
                typename CONFIG_T::bias_t bias[CONFIG_T::n_scale_bias]) {
-    //#pragma HLS ARRAY_PARTITION variable=scale complete
-    //#pragma HLS ARRAY_PARTITION variable=bias complete
+    #pragma HLS ARRAY_PARTITION variable=scale complete
+    #pragma HLS ARRAY_PARTITION variable=bias complete
 
     constexpr unsigned ii = CONFIG_T::n_in / CONFIG_T::multiplier_limit;
     //#pragma HLS ALLOCATION operation instances=mul limit=CONFIG_T::multiplier_limit
@@ -54,7 +54,7 @@ BatchNormLoop:
 template <class data_T, typename CONFIG_T>
 void normalize_binary_tanh(hls::stream<data_T> &data, hls::stream<nnet::array<ap_uint<1>, CONFIG_T::n_scale_bias>> &res,
                            typename data_T::value_type threshold[CONFIG_T::n_scale_bias]) {
-    //#pragma HLS ARRAY_PARTITION variable=threshold complete
+    #pragma HLS ARRAY_PARTITION variable=threshold complete
 
 BinaryNormLoop:
     for (int i = 0; i < CONFIG_T::n_in / data_T::size; i++) {
@@ -85,8 +85,8 @@ template <class data_T, typename CONFIG_T>
 void normalize_ternary_tanh(hls::stream<data_T> &data, hls::stream<nnet::array<ap_int<2>, CONFIG_T::n_scale_bias>> &res,
                             typename data_T::value_type threshold_hi[CONFIG_T::n_scale_bias],
                             typename data_T::value_type threshold_lo[CONFIG_T::n_scale_bias]) {
-    //#pragma HLS ARRAY_PARTITION variable=threshold_hi complete
-    //#pragma HLS ARRAY_PARTITION variable=threshold_lo complete
+    #pragma HLS ARRAY_PARTITION variable=threshold_hi complete
+    #pragma HLS ARRAY_PARTITION variable=threshold_lo complete
 
 TernaryNormLoop:
     for (int i = 0; i < CONFIG_T::n_in / data_T::size; i++) {

@@ -97,7 +97,7 @@ void pooling1d_cl(data_T data[CONFIG_T::n_in * CONFIG_T::n_filt], res_T res[CONF
         for (int ii = 0; ii < restricted_padded_width; ii += CONFIG_T::stride_width) {
             unsigned overlap_pixel = 0;
             data_T pool[CONFIG_T::pool_width];
-            //#pragma HLS ARRAY_PARTITION variable=pool complete dim=0
+            #pragma HLS ARRAY_PARTITION variable=pool complete dim=0
 
             for (int jj = 0; jj < CONFIG_T::pool_width; jj++) {
                 if (ii + jj >= CONFIG_T::pad_left && ii + jj < CONFIG_T::n_in + CONFIG_T::pad_left) {
@@ -128,7 +128,7 @@ void global_pooling1d_cl(data_T data[CONFIG_T::n_in * CONFIG_T::n_filt], res_T r
 
     for (int ff = 0; ff < CONFIG_T::n_filt; ff++) {
         data_T pool[CONFIG_T::n_in];
-        //#pragma HLS ARRAY_PARTITION variable=pool complete dim=0
+        #pragma HLS ARRAY_PARTITION variable=pool complete dim=0
         for (int jj = 0; jj < CONFIG_T::n_in; jj++) {
             pool[jj] = data[jj * CONFIG_T::n_filt + ff];
         }
@@ -191,7 +191,7 @@ void pooling2d_cl(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_
             // Loop over input image x in steps of stride
             for (int jj = 0; jj < restricted_padded_width; jj += CONFIG_T::stride_width) {
                 data_T pool[CONFIG_T::pool_height * CONFIG_T::pool_width];
-                //#pragma HLS ARRAY_PARTITION variable=pool complete dim=0
+                #pragma HLS ARRAY_PARTITION variable=pool complete dim=0
 
                 unsigned overlap_pixel = 0;
 
@@ -244,7 +244,7 @@ void pooling2d_cf(data_T data[CONFIG_T::in_height * CONFIG_T::in_width * CONFIG_
             // Loop over input image x in steps of stride
             for (int jj = 0; jj < restricted_padded_width; jj += CONFIG_T::stride_width) {
                 data_T pool[CONFIG_T::pool_height * CONFIG_T::pool_width];
-                //#pragma HLS ARRAY_PARTITION variable=pool complete dim=0
+                #pragma HLS ARRAY_PARTITION variable=pool complete dim=0
                 // Keep track of number of pixels in image vs padding region
                 unsigned img_overlap = 0;
                 // Loop over pool window y

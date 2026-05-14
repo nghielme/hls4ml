@@ -100,7 +100,7 @@ void dot1d(input1_T data1[CONFIG_T::n_in], input2_T data2[CONFIG_T::n_in], res_T
     //#pragma HLS ALLOCATION operation instances=mul limit=CONFIG_T::multiplier_limit
 
     typename CONFIG_T::accum_t mult[CONFIG_T::n_in];
-    //#pragma HLS ARRAY_PARTITION variable=mult complete
+    #pragma HLS ARRAY_PARTITION variable=mult complete
     typename CONFIG_T::accum_t acc = 0;
 
 Product:

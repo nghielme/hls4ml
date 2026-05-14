@@ -76,7 +76,7 @@ template <class T> void sincos_lut(const T &input, T output[2]) {
     }
 
     // Leaving this commented out makes the table to to BRAM
-    //#pragma HLS ARRAY_PARTITION variable=sincos complete dim=0
+    #pragma HLS ARRAY_PARTITION variable=sincos complete dim=0
 
     typedef ap_uint<AP_MAX(T::width - T::iwidth - 3, 1)> lutindextype1;
     // Extracting (MSB-3:LSB) bits of scaled input to determine the lookup table index

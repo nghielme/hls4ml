@@ -22,13 +22,13 @@ void conv_1d_resource_cl(data_T data[CONFIG_T::in_width * CONFIG_T::n_chan],
            "This function is correct only for RF <= FILT_WIDTH * N_CHAN");
 
     data_T data_buf[CONFIG_T::n_pixels][mult_n_in];
-    //#pragma HLS ARRAY_PARTITION variable=data_buf complete dim=0
+    #pragma HLS ARRAY_PARTITION variable=data_buf complete dim=0
 
     //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
     typename CONFIG_T::accum_t acc[CONFIG_T::n_pixels][mult_n_out];
-    //#pragma HLS ARRAY_PARTITION variable=acc complete dim=0
+    #pragma HLS ARRAY_PARTITION variable=acc complete dim=0
 
 PartitionLoop:
     #pragma clang loop unroll(full)
