@@ -2,6 +2,10 @@ set tcldir [file dirname [info script]]
 source [file join $tcldir project.tcl]
 source [file join $tcldir statistics.tcl]
 
+# Avoid WebTalk host-info collection that can crash Vivado in Docker when
+# libudev scans /sys (HAPRWebtalkHelper / GetHostInfo path).
+catch {config_webtalk -user off}
+
 set outputDir vivado_reports
 set reportBase ${project_name}_report
 
