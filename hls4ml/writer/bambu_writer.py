@@ -34,9 +34,9 @@ class BambuWriter(Writer):
         return str(value).strip().lower() not in ('0', 'false', 'no', 'off')
 
     @classmethod
-    def _should_emit_array_partition_pragma(cls):
-        # Default to enabled to preserve behavior unless explicitly disabled.
-        return cls._env_flag_enabled('USE_BAMBU_ARRAY_PARTITION', True)
+    def _should_copy_ac_types(cls):
+        """When false, skip vendoring firmware/ac_types (non-default; can break builds)."""
+        return cls._env_flag_enabled('USE_BAMBU_AC_TYPES', True)
 
     def print_array_to_cpp(self, var, odir, namespace=None, write_txt_file=True):
         """Write a weights array to C++ header files.
@@ -1190,16 +1190,17 @@ class BambuWriter(Writer):
             copyfile(srcpath + h, dstpath + h)
             self._rewrite_array_partition_pragmas(dstpath + h)
 
-        # ac_types
-        filedir = os.path.dirname(os.path.abspath(__file__))
+        # ac_types (ap_fixed headers); omit when USE_BAMBU_AC_TYPES=0
+        if self._should_copy_ac_types():
+            filedir = os.path.dirname(os.path.abspath(__file__))
 
-        srcpath = os.path.join(filedir, '../templates/bambu/ac_types/')
-        dstpath = f'{model.config.get_output_dir()}/firmware/ac_types/'
+            srcpath = os.path.join(filedir, '../templates/bambu/ac_types/')
+            dstpath = f'{model.config.get_output_dir()}/firmware/ac_types/'
 
-        if os.path.exists(dstpath):
-            rmtree(dstpath)
+            if os.path.exists(dstpath):
+                rmtree(dstpath)
 
-        copytree(srcpath, dstpath)
+            copytree(srcpath, dstpath)
 
         # custom source
         filedir = os.path.dirname(os.path.abspath(__file__))
