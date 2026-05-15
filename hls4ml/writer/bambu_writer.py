@@ -16,6 +16,22 @@ config_filename = 'hls4ml_config.yml'
 
 
 class BambuWriter(Writer):
+    @staticmethod
+    def _env_flag_enabled(name, default):
+        value = os.environ.get(name)
+        if value is None:
+            return default
+        return str(value).strip().lower() not in ('0', 'false', 'no', 'off')
+
+    @classmethod
+    def _should_emit_array_partition_pragma(cls, top_level=False):
+        # Default to enabled to preserve behavior unless explicitly disabled.
+        if not cls._env_flag_enabled('USE_BAMBU_ARRAY_PARTITION', True):
+            return False
+        if top_level and not cls._env_flag_enabled('USE_BAMBU_TOP_LEVEL_ARRAY_PARTITION', True):
+            return False
+        return True
+
     def print_array_to_cpp(self, var, odir, namespace=None, write_txt_file=True):
         """Write a weights array to C++ header files.
 
@@ -81,7 +97,7 @@ class BambuWriter(Writer):
             os.makedirs(f'{model.config.get_output_dir()}/firmware/weights')
 
     @staticmethod
-    def _make_array_pragma(variable, top_level_arg=False):
+    def _make_array_pragma(variable):
         """
         Layers in hls_model.py can specify output array partitioning through the `pragma` attribute.
         If `pragma` is a string: options are 'partition', 'reshape', or 'stream'.
@@ -225,9 +241,11 @@ class BambuWriter(Writer):
 
                 if io_type == 'io_parallel':
                     for i in model_inputs:
-                        newline += indent + self._make_array_pragma(i, top_level_arg=True) + '\n'
+                        if self._should_emit_array_partition_pragma(top_level=True):
+                            newline += indent + self._make_array_pragma(i) + '\n'
                     for o in model_outputs:
-                        newline += indent + self._make_array_pragma(o, top_level_arg=True) + '\n'
+                        if self._should_emit_array_partition_pragma(top_level=True):
+                            newline += indent + self._make_array_pragma(o) + '\n'
                     # Two fixes for Bambu's pragma parser (clang-16 plugin):
                     #   1. Emit one pragma per port instead of a single
                     #      comma-separated port list. Bambu's parser does not
@@ -262,7 +280,9 @@ class BambuWriter(Writer):
                             if def_cpp is not None:
                                 newline += '    ' + def_cpp + ';\n'
                                 if var.pragma:
-                                    newline += '    ' + self._make_array_pragma(var) + '\n\n'
+                                    if self._should_emit_array_partition_pragma():
+                                        newline += '    ' + self._make_array_pragma(var) + '\n'
+                                    newline += '\n'
                 for layer in model.get_layers():
                     func = layer.get_attr('function_cpp', None)
                     if func:
