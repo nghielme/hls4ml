@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 import stat
 import tarfile
 from collections import OrderedDict
@@ -16,6 +17,8 @@ config_filename = 'hls4ml_config.yml'
 
 
 class BambuWriter(Writer):
+    _ARRAY_PARTITION_PRAGMA_RE = re.compile(r'^(\s*)(?://\s*)?(#pragma\s+HLS\s+array_partition\b.*)$', re.IGNORECASE)
+
     @staticmethod
     def _env_flag_enabled(name, default):
         value = os.environ.get(name)
@@ -24,13 +27,9 @@ class BambuWriter(Writer):
         return str(value).strip().lower() not in ('0', 'false', 'no', 'off')
 
     @classmethod
-    def _should_emit_array_partition_pragma(cls, top_level=False):
+    def _should_emit_array_partition_pragma(cls):
         # Default to enabled to preserve behavior unless explicitly disabled.
-        if not cls._env_flag_enabled('USE_BAMBU_ARRAY_PARTITION', True):
-            return False
-        if top_level and not cls._env_flag_enabled('USE_BAMBU_TOP_LEVEL_ARRAY_PARTITION', True):
-            return False
-        return True
+        return cls._env_flag_enabled('USE_BAMBU_ARRAY_PARTITION', True)
 
     def print_array_to_cpp(self, var, odir, namespace=None, write_txt_file=True):
         """Write a weights array to C++ header files.
@@ -142,6 +141,26 @@ class BambuWriter(Writer):
             # not supported).
             return f'//#pragma HLS STREAM variable={variable.name} depth={depth}'
 
+    @classmethod
+    def _rewrite_array_partition_pragmas(cls, header_path):
+        enable_array_partition = cls._should_emit_array_partition_pragma()
+
+        rewritten = []
+        with open(header_path) as header:
+            for line in header:
+                match = cls._ARRAY_PARTITION_PRAGMA_RE.match(line)
+                if match:
+                    indent, pragma = match.groups()
+                    if enable_array_partition:
+                        rewritten.append(f'{indent}{pragma}\n')
+                    else:
+                        rewritten.append(f'{indent}//{pragma}\n')
+                else:
+                    rewritten.append(line)
+
+        with open(header_path, 'w') as header:
+            header.writelines(rewritten)
+
     def write_project_cpp(self, model):
         """Write the main architecture source file (myproject.cpp)
 
@@ -241,10 +260,10 @@ class BambuWriter(Writer):
 
                 if io_type == 'io_parallel':
                     for i in model_inputs:
-                        if self._should_emit_array_partition_pragma(top_level=True):
+                        if self._should_emit_array_partition_pragma():
                             newline += indent + self._make_array_pragma(i) + '\n'
                     for o in model_outputs:
-                        if self._should_emit_array_partition_pragma(top_level=True):
+                        if self._should_emit_array_partition_pragma():
                             newline += indent + self._make_array_pragma(o) + '\n'
                     # Two fixes for Bambu's pragma parser (clang-16 plugin):
                     #   1. Emit one pragma per port instead of a single
@@ -1090,6 +1109,7 @@ class BambuWriter(Writer):
             )
         for h in headers:
             copyfile(srcpath + h, dstpath + h)
+            self._rewrite_array_partition_pragmas(dstpath + h)
 
         # ac_types
         filedir = os.path.dirname(os.path.abspath(__file__))
