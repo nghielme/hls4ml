@@ -95,12 +95,17 @@ class BambuWriter(Writer):
             os.makedirs(f'{model.config.get_output_dir()}/firmware/weights')
 
     @staticmethod
-    def _make_array_pragma(variable):
+    def _make_array_pragma(variable, top_level_arg=False):
         """
         Layers in hls_model.py can specify output array partitioning through the `pragma` attribute.
         If `pragma` is a string: options are 'partition', 'reshape', or 'stream'.
         If `pragma` is a tuple: (mode, type, factor) where mode is 'partition' or 'reshape', type is
         'complete', 'cyclic', or 'block', and factor is an integer only used when the type is not 'complete'.
+
+        Bambu does not support ARRAY_RESHAPE, so reshape requests are emitted
+        as ARRAY_PARTITION instead. ARRAY_PARTITION is emitted live for both
+        internal arrays and top-level arguments to match the requested pragma
+        policy, even if some Bambu versions still fail on top-level partitions.
         """
 
         config = variable.pragma
@@ -118,14 +123,21 @@ class BambuWriter(Writer):
             factor = 0
 
         if mode in ['partition', 'reshape']:
+            mode = 'partition'
             if typ == 'complete':
-                template = '//#pragma HLS ARRAY_{mode} variable={name} {type} dim={dim}'
+                template = '#pragma HLS ARRAY_{mode} variable={name} {type} dim={dim}'
             else:
-                template = '//#pragma HLS ARRAY_{mode} variable={name} {type} factor={factor} dim={dim}'
+                template = '#pragma HLS ARRAY_{mode} variable={name} {type} factor={factor} dim={dim}'
 
-            return template.format(mode=mode.upper(), name=variable.name, type=typ, factor=factor, dim=0)
+            return template.format(
+                mode=mode.upper(), name=variable.name,
+                type=typ, factor=factor, dim=0,
+            )
 
         elif mode == 'stream':
+            # STREAM pragmas stay commented while the io_stream path is blocked
+            # upstream by Bambu's InterfaceInfer pass (ac_channel<>::fifo::_read
+            # not supported).
             return f'//#pragma HLS STREAM variable={variable.name} depth={depth}'
 
     # Helpers reused by `write_project_cpp` and (in a forthcoming subclass)
@@ -323,9 +335,23 @@ class BambuWriter(Writer):
 
                 if io_type == 'io_parallel':
                     for i in model_inputs:
-                        newline += indent + self._make_array_pragma(i) + '\n'
+                        newline += indent + self._make_array_pragma(i, top_level_arg=True) + '\n'
                     for o in model_outputs:
-                        newline += indent + self._make_array_pragma(o) + '\n'
+                        newline += indent + self._make_array_pragma(o, top_level_arg=True) + '\n'
+                    # Two fixes for Bambu's pragma parser (clang-16 plugin):
+                    #   1. Emit one pragma per port instead of a single
+                    #      comma-separated port list. Bambu's parser does not
+                    #      accept `port=in1,in2` syntax.
+                    #   2. Use `#pragma HLS_interface ...` (underscore form)
+                    #      rather than `#pragma HLS interface ...`. The space
+                    #      form is parsed by the strict mode-validation path
+                    #      which rejects `mode=valid` with
+                    #      `error: Invalid HLS interface mode`. The underscore
+                    #      form goes through the lenient parser and is
+                    #      accepted, while still letting --generate-interface=INFER
+                    #      build the correct interface from the signature.
+                    for port in all_inputs + all_outputs:
+                        newline += indent + '#pragma HLS_interface mode=valid port={}\n'.format(port)
                     newline += pipeline_pragma
 
                 if io_type == 'io_stream':
