@@ -38,13 +38,18 @@ fi
 # across releases (older versions ship clang++-16 under usr/bin/, newer ones
 # under usr/compilers/clang-16/bin/), so probe both known locations.
 CC=""
-if [ -n "$MOUNT_DIR" ]; then
+for _root in "$MOUNT_DIR" "${BAMBU_SQUASHFS_ROOT:-}"; do
+    [ -n "$_root" ] || continue
     for candidate in \
-        "$MOUNT_DIR/usr/compilers/clang-16/bin/clang++-16" \
-        "$MOUNT_DIR/usr/bin/clang++-16"
+        "$_root/usr/compilers/clang-16/bin/clang++-16" \
+        "$_root/usr/bin/clang++-16"
     do
-        if [ -x "$candidate" ]; then CC="$candidate"; break; fi
+        if [ -x "$candidate" ]; then CC="$candidate"; break 2; fi
     done
+done
+# Last resort: clang++-16 on PATH (e.g. set by Bambu settings.sh)
+if [ -z "$CC" ] && command -v clang++-16 >/dev/null 2>&1; then
+    CC="$(command -v clang++-16)"
 fi
 if [ -z "$CC" ]; then
     echo "Bambu AppImage clang++-16 not detected. Using fallback compiler."
