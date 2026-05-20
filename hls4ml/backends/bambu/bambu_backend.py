@@ -84,16 +84,18 @@ partname_to_bambu = {
     # 7-series
     "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324", "family" : "Xilinx"}, # 7-series Artix; matches the entry in Bambu's `Available devices` listing
     # : "xc7vx330t-1ffg1157",
-    # : "xc7vx485t-2ffg1761-VVD",
-    # : "xc7vx690t-3ffg1930-VVD", 
+    # : "xc7vx485t-2ffg1761",
+    # : "xc7vx690t-3ffg1930", 
     # : "xc7z020-1clg484",
-    # : "xc7z020-1clg484-VVD", 
-    # : "xc7z020-1clg484-YOSYS-VVD", 
-    # : "xc7z045-2ffg900-VVD",
+    # : "xc7z020-1clg484-YOSYS", 
+    # : "xc7z045-2ffg900",
 
     # UltraScale / UltraScale+
-    # : "xcku060-3ffva1156-VVD", 
-    # : "xcu280-2Lfsvh2892-VVD", 
+    # : "xcku060-3ffva1156",
+    # : "xcu250-2Lfigd2104",
+    # : "xcu280-2Lfsvh2892",
+    # : "xcu50-2fsvh2104",
+    "xczu7ev-ffvc1156-2-e" : {"device_name" : "xczu7ev-2ffvc1156", "family" : "Xilinx"},
     "xcu55c-fsvh2892-2L-e" : {"device_name" : "xcu55c-2Lfsvh2892", "family" : "Xilinx"}
 }
 
@@ -418,10 +420,29 @@ class BambuBackend(FPGABackend):
         part_family = model.config.get_config_value("FPGAFamily")
 
         # Bambu-specific command/flags
+        # `-ftemplate-depth=2048` is forwarded by Bambu directly to its
+        # clang-16 front-end. The default 1024-deep template instantiation
+        # limit is hit by `std::make_index_sequence<N>` in libstdc++ 4.9.4
+        # (the libstdc++ shipped inside Bambu's AppImage) when N == 1024,
+        # which is exactly the upper bound `core_templates.py` clamps
+        # softmax's `exp_table_size` to. The recursive index-tuple builder
+        # at `bits/utility:215` in that libstdc++ requires N levels of
+        # depth, so any softmax whose input `data_T` width is >= 10 (e.g.
+        # `ap_fixed<16,6>` or a dense accumulator like `ac_fixed<18,10>`)
+        # trips the limit and the front-end aborts with `recursive template
+        # instantiation exceeded maximum depth of 1024`. Raising the
+        # ceiling is the fix the compiler error itself suggests, and is
+        # harmless for the smaller cases (no extra runtime/memory cost).
+        # See firmware/nnet_utils/nnet_activation.h:228 in hls4ml's bambu
+        # templates for the actual `make_index_sequence` call site.
+        CC_TEMPLATE_DEPTH = '-ftemplate-depth=2048'
+
         BASE_COMMAND = ['bambu'] + self._get_hls_sources(project_name) + [f'--top-fname={self._get_top_fname(project_name)}']
+
         if os.environ.get('USE_BAMBU_AC_TYPES'):
             REQ_ARGS = ['-lm',
                         '--compiler=I386_CLANG16',
+                        CC_TEMPLATE_DEPTH,
                         '--generate-interface=INFER',
                         '-v4'
                        ]
@@ -429,8 +450,10 @@ class BambuBackend(FPGABackend):
             REQ_ARGS = ['-lm', 
                         '-Ifirmware/ac_types',
                         '--compiler=I386_CLANG16',
+                        CC_TEMPLATE_DEPTH,
                         '--generate-interface=INFER',
-                        '-v4'
+                        '-v4',
+                        '-m64'
                        ]
         CMD_ARGS      = []
         
@@ -438,10 +461,9 @@ class BambuBackend(FPGABackend):
 
         ### RESET ###
         bambu_output_patterns = [
-            f"*{project_name}*.cache", f"*{project_name}*.hw", f"*{project_name}*.ip_user_files", 
-            ".Xil", "vivado_reports", "HLS_output", f"*{project_name}*.xpr", "bambu_results_*.xml", 
-            "clockInfo.txt", f"{project_name}-*_tb.exe", f"{project_name}.v", "results.txt",
-            "simulate*.sh", "synthesize*.sh"            
+            "HLS_output", "panda-temp", "vivado_reports", "bambu_results*.xml", 
+            "evaluate*.sh", "memory_allocation*.xml", f"{project_name}-*_tb.exe", 
+            f"{project_name}.v", "results.txt", "synthesize*.sh", "panda_libtech.v", "*.mem"       
             ]
         matches = [p for pat in bambu_output_patterns for p in Path(project_dir).glob(pat)]
         is_dirty_directory = any(matches)
@@ -656,7 +678,7 @@ class BambuBackend(FPGABackend):
             # `HLS_output/xilinx/flow_backend` in current). Search the full
             # HLS_output tree so the script keeps working across versions.
             return(
-                'src_root="HLS_output"\n'
+                'src_root="HLS_output/xilinx/flow_backend"\n'
                 'dst_root="vivado_reports"\n'
                 'mkdir -p "$dst_root"\n'
                 r'find "$src_root" -type f \( -iname "*.rpt" -o -iname "*.xml" \) -exec cp -p {} "$dst_root"/ \;'

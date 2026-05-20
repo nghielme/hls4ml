@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 import stat
 import tarfile
 from collections import OrderedDict
@@ -16,6 +17,20 @@ config_filename = 'hls4ml_config.yml'
 
 
 class BambuWriter(Writer):
+    _ARRAY_PARTITION_PRAGMA_RE = re.compile(r'^(\s*)(?://\s*)?(#pragma\s+HLS\s+array_partition\b.*)$', re.IGNORECASE)
+
+    @staticmethod
+    def _env_flag_enabled(name, default):
+        value = os.environ.get(name)
+        if value is None:
+            return default
+        return str(value).strip().lower() not in ('0', 'false', 'no', 'off')
+
+    @classmethod
+    def _should_emit_array_partition_pragma(cls):
+        # Default to enabled to preserve behavior unless explicitly disabled.
+        return cls._env_flag_enabled('USE_BAMBU_ARRAY_PARTITION', True)
+      
     # Whether the top-level core function should emit its own
     # `#pragma HLS interface` lines. A subclass that wraps this core inside
     # a different top-level (and owns the AXI/AXIS interface there) sets
@@ -101,6 +116,11 @@ class BambuWriter(Writer):
         If `pragma` is a string: options are 'partition', 'reshape', or 'stream'.
         If `pragma` is a tuple: (mode, type, factor) where mode is 'partition' or 'reshape', type is
         'complete', 'cyclic', or 'block', and factor is an integer only used when the type is not 'complete'.
+
+        Bambu does not support ARRAY_RESHAPE, so reshape requests are emitted
+        as ARRAY_PARTITION instead. ARRAY_PARTITION is emitted live for both
+        internal arrays and top-level arguments to match the requested pragma
+        policy, even if some Bambu versions still fail on top-level partitions.
         """
 
         config = variable.pragma
@@ -118,16 +138,43 @@ class BambuWriter(Writer):
             factor = 0
 
         if mode in ['partition', 'reshape']:
+            mode = 'partition'
             if typ == 'complete':
-                template = '//#pragma HLS ARRAY_{mode} variable={name} {type} dim={dim}'
+                template = '#pragma HLS ARRAY_{mode} variable={name} {type} dim={dim}'
             else:
-                template = '//#pragma HLS ARRAY_{mode} variable={name} {type} factor={factor} dim={dim}'
+                template = '#pragma HLS ARRAY_{mode} variable={name} {type} factor={factor} dim={dim}'
 
-            return template.format(mode=mode.upper(), name=variable.name, type=typ, factor=factor, dim=0)
+            return template.format(
+                mode=mode.upper(), name=variable.name,
+                type=typ, factor=factor, dim=0,
+            )
 
         elif mode == 'stream':
+            # STREAM pragmas stay commented while the io_stream path is blocked
+            # upstream by Bambu's InterfaceInfer pass (ac_channel<>::fifo::_read
+            # not supported).
             return f'//#pragma HLS STREAM variable={variable.name} depth={depth}'
 
+    @classmethod
+    def _rewrite_array_partition_pragmas(cls, header_path):
+        enable_array_partition = cls._should_emit_array_partition_pragma()
+
+        rewritten = []
+        with open(header_path) as header:
+            for line in header:
+                match = cls._ARRAY_PARTITION_PRAGMA_RE.match(line)
+                if match:
+                    indent, pragma = match.groups()
+                    if enable_array_partition:
+                        rewritten.append(f'{indent}{pragma}\n')
+                    else:
+                        rewritten.append(f'{indent}//{pragma}\n')
+                else:
+                    rewritten.append(line)
+
+        with open(header_path, 'w') as header:
+            header.writelines(rewritten)
+            
     # Helpers reused by `write_project_cpp` and (in a forthcoming subclass)
     # by a wrapper writer that emits a different top-level function around
     # this core. The first three are consumed below; the last three
@@ -323,9 +370,25 @@ class BambuWriter(Writer):
 
                 if io_type == 'io_parallel':
                     for i in model_inputs:
-                        newline += indent + self._make_array_pragma(i) + '\n'
+                        if self._should_emit_array_partition_pragma():
+                            newline += indent + self._make_array_pragma(i) + '\n'
                     for o in model_outputs:
-                        newline += indent + self._make_array_pragma(o) + '\n'
+                        if self._should_emit_array_partition_pragma():
+                            newline += indent + self._make_array_pragma(o) + '\n'
+                    # Two fixes for Bambu's pragma parser (clang-16 plugin):
+                    #   1. Emit one pragma per port instead of a single
+                    #      comma-separated port list. Bambu's parser does not
+                    #      accept `port=in1,in2` syntax.
+                    #   2. Use `#pragma HLS_interface ...` (underscore form)
+                    #      rather than `#pragma HLS interface ...`. The space
+                    #      form is parsed by the strict mode-validation path
+                    #      which rejects `mode=valid` with
+                    #      `error: Invalid HLS interface mode`. The underscore
+                    #      form goes through the lenient parser and is
+                    #      accepted, while still letting --generate-interface=INFER
+                    #      build the correct interface from the signature.
+                    for port in all_inputs + all_outputs:
+                        newline += indent + '#pragma HLS interface mode=valid port={}\n'.format(port)
                     newline += pipeline_pragma
 
                 if io_type == 'io_stream':
@@ -1125,8 +1188,10 @@ class BambuWriter(Writer):
             )
         for h in headers:
             copyfile(srcpath + h, dstpath + h)
+            self._rewrite_array_partition_pragmas(dstpath + h)
 
-        # ac_types
+        # ac_types (ap_fixed headers) — always copied; USE_BAMBU_AC_TYPES is
+        # read by Bambu's own build scripts, not by Python here.
         filedir = os.path.dirname(os.path.abspath(__file__))
 
         srcpath = os.path.join(filedir, '../templates/bambu/ac_types/')

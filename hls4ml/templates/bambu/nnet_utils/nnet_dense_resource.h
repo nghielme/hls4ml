@@ -27,14 +27,14 @@ void dense_resource_rf_leq_nin(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::
 
     //#pragma HLS function_instantiate variable=weights,biases
     //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
     if (CONFIG_T::reuse_factor > 1) {
         //#pragma HLS RESOURCE variable=weights core=ROM_nP_BRAM
     }
 
     typename CONFIG_T::accum_t acc[CONFIG_T::n_out];
-    //#pragma HLS ARRAY_PARTITION variable=acc complete
+    #pragma HLS ARRAY_PARTITION variable=acc complete
 
 InitAccum:
     #pragma clang loop unroll(full)
@@ -104,14 +104,14 @@ void dense_resource_rf_gt_nin_rem0(data_T data[CONFIG_T::n_in], res_T res[CONFIG
 
     //#pragma HLS function_instantiate variable=weights,biases
     //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
     if (CONFIG_T::reuse_factor > 1) {
         //#pragma HLS RESOURCE variable=weights core=ROM_nP_BRAM
     }
 
     typename CONFIG_T::accum_t acc[CONFIG_T::n_out];
-    //#pragma HLS ARRAY_PARTITION variable=acc complete
+    #pragma HLS ARRAY_PARTITION variable=acc complete
 
 InitAccum:
     #pragma clang loop unroll(full)
@@ -189,14 +189,14 @@ void dense_resource_rf_gt_nin(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n
 
     //#pragma HLS function_instantiate variable=weights,biases
     //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=block_factor
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
     if (CONFIG_T::reuse_factor > 1) {
         //#pragma HLS RESOURCE variable=weights core=ROM_nP_BRAM
     }
 
     typename CONFIG_T::accum_t acc[CONFIG_T::n_out];
-    //#pragma HLS ARRAY_PARTITION variable=acc complete
+    #pragma HLS ARRAY_PARTITION variable=acc complete
 
 InitAccum:
     #pragma clang loop unroll(full)
@@ -209,7 +209,7 @@ ReuseLoop:
     for (int ir = 0; ir < rufactor; ir++) {
         //#pragma HLS PIPELINE II=1 rewind
         typename CONFIG_T::accum_t tmpmult[block_factor];
-        //#pragma HLS ARRAY_PARTITION variable=tmpmult complete
+        #pragma HLS ARRAY_PARTITION variable=tmpmult complete
 
     MultLoop:
         #pragma clang loop unroll(full)
@@ -224,7 +224,7 @@ ReuseLoop:
         }
 
         typename CONFIG_T::accum_t mult[multiplier_limit];
-        //#pragma HLS ARRAY_PARTITION variable=mult complete
+        #pragma HLS ARRAY_PARTITION variable=mult complete
 
     ResetMult:
         #pragma clang loop unroll(full)

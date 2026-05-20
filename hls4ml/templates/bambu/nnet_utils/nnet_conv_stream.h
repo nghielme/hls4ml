@@ -84,9 +84,9 @@ void mult_buffer(hls::stream<typename data_T::value_type> data_window[CONFIG_T::
     #pragma HLS INLINE
 
     typename data_T::value_type data[CONFIG_T::kernel_size * CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable = data complete
+    #pragma HLS ARRAY_PARTITION variable = data complete
     typename res_T::value_type res[CONFIG_T::n_filt];
-    //#pragma HLS ARRAY_PARTITION variable = res complete
+    #pragma HLS ARRAY_PARTITION variable = res complete
 
 InitData:
     #pragma clang loop unroll(full)
@@ -229,7 +229,7 @@ void shift_line_buffer(
 
     // Temporary buffer for popped (shifted) elements
     typename data_T::value_type shift_buffer[CONFIG_T::filt_height][CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable = shift_buffer complete dim = 0
+    #pragma HLS ARRAY_PARTITION variable = shift_buffer complete dim = 0
 
 UpdateBuffer:
     #pragma clang loop unroll(full)
@@ -278,10 +278,10 @@ void compute_output_buffer_2d(
     static int sY = 0; // Stride Y
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_height * CONFIG_T::filt_width * CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable = kernel_data complete
+    #pragma HLS ARRAY_PARTITION variable = kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_filt];
-    //#pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
+    #pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
@@ -345,10 +345,10 @@ void compute_output_buffer_1d(
     static int sX = 0; // stride counter
 
     static typename data_T::value_type kernel_data[CONFIG_T::filt_width * CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable = kernel_data complete
+    #pragma HLS ARRAY_PARTITION variable = kernel_data complete
 
     typename res_T::value_type res_out[CONFIG_T::n_filt];
-    //#pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
+    #pragma HLS ARRAY_PARTITION variable = res_out complete dim = 0
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)

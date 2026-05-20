@@ -27,8 +27,8 @@ void dense_compressed(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_out],
     const int multiplier_limit = DIV_ROUNDUP(CONFIG_T::n_nonzeros, CONFIG_T::reuse_factor);
 
     typename CONFIG_T::accum_t acc[CONFIG_T::n_out];
-    //#pragma HLS ARRAY_PARTITION variable=acc    complete
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=acc    complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
     //#pragma HLS ARRAY_RESHAPE   variable=weights block factor=multiplier_limit
 
 #ifdef __VITIS_HLS__
@@ -51,7 +51,7 @@ ReuseLoop:
         //#pragma HLS PIPELINE  II=1 rewind
 
         typename CONFIG_T::accum_t mult[CONFIG_T::n_out];
-        //#pragma HLS ARRAY_PARTITION variable=mult complete
+        #pragma HLS ARRAY_PARTITION variable=mult complete
 
     ResetMult:
         #pragma clang loop unroll(full)

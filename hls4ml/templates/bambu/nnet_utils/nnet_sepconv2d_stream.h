@@ -23,14 +23,14 @@ void depthwise_conv_2d_encoded_cl(
         //#pragma HLS STREAM variable=data_window[i_out] depth=win_depth
     }
 
-    //#pragma HLS ARRAY_PARTITION variable=CONFIG_T::pixels complete
+    #pragma HLS ARRAY_PARTITION variable=CONFIG_T::pixels complete
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
     unsigned outputs_ready = 0;
 
     ap_uint<CONFIG_T::filt_height * CONFIG_T::filt_width> pixel_idx[data_T::size / CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=pixel_idx complete
+    #pragma HLS ARRAY_PARTITION variable=pixel_idx complete
 
 ReadInputHeight:
     for (unsigned i_ih = 0; i_ih < CONFIG_T::in_height; i_ih++) {
@@ -58,7 +58,7 @@ void depthwise_conv_2d_buffer_cl(
 
     static ap_shift_reg<typename data_T::value_type, CONFIG_T::in_width> line_buffer[CONFIG_T::filt_height - 1]
                                                                                     [CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable = line_buffer complete dim = 2
+    #pragma HLS ARRAY_PARTITION variable = line_buffer complete dim = 2
 
 ReadInputHeight:
     for (unsigned i_ih = 0; i_ih < CONFIG_T::in_height; i_ih++) {
@@ -103,8 +103,8 @@ void pointwise_conv_2d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res,
     assert(CONFIG_T::pad_top == 0 && CONFIG_T::pad_bottom == 0 && CONFIG_T::pad_left == 0 && CONFIG_T::pad_right == 0);
     assert(CONFIG_T::filt_height == 1 && CONFIG_T::filt_width == 1);
 
-    //#pragma HLS ARRAY_PARTITION variable=weights complete
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=weights complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
 ReadInputHeight:
     for (unsigned i_ih = 0; i_ih < CONFIG_T::in_height; i_ih++) {

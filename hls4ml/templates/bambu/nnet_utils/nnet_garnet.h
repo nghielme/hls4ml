@@ -111,8 +111,8 @@ template <class CONFIG_T, class E = typename CONFIG_T::edge_weight_t> struct Mea
 
     Means() {
         #pragma HLS inline
-        //#pragma HLS ARRAY_PARTITION variable=edge_weight_mean complete
-        //#pragma HLS ARRAY_PARTITION variable=weighted_feature_mean complete
+        #pragma HLS ARRAY_PARTITION variable=edge_weight_mean complete
+        #pragma HLS ARRAY_PARTITION variable=weighted_feature_mean complete
         //#pragma HLS UNROLL region
 
     Aggregators:
@@ -204,7 +204,7 @@ template <class CONFIG_T, class E = typename CONFIG_T::edge_weight_t> struct Wei
     WeightsAndMeans() : Means<CONFIG_T, E>() {
         #pragma HLS inline
         unsigned const reshape_factor = CONFIG_T::n_aggregators * (CONFIG_T::n_vertices / CONFIG_T::reuse_factor);
-        //#pragma HLS ARRAY_PARTITION variable=edge_weights cyclic factor=reshape_factor
+        #pragma HLS ARRAY_PARTITION variable=edge_weights cyclic factor=reshape_factor
     }
 
     void set_weight(unsigned iva, edge_weight_t const &weight) {
@@ -233,7 +233,7 @@ struct OutputBiasNormalizer<CONFIG_T, nvtx_T, typename std::enable_if<not CONFIG
     biases_t output_biases[CONFIG_T::n_out_features];
 
     OutputBiasNormalizer(nvtx_T const nvtx) {
-        //#pragma HLS ARRAY_PARTITION variable=output_biases complete
+        #pragma HLS ARRAY_PARTITION variable=output_biases complete
         //#pragma HLS UNROLL region
 
         // Cannot add a loop label here due to a Vivado HLS bug, apparently
@@ -388,7 +388,7 @@ compute_vertex_output(arrays_T const &arrays, unsigned iv,
     #pragma HLS inline
 
     typename arrays_T::edge_weight_t edge_weights[CONFIG_T::n_aggregators];
-    //#pragma HLS ARRAY_PARTITION variable=edge_weights complete
+    #pragma HLS ARRAY_PARTITION variable=edge_weights complete
 
 Aggregators1:
     for (unsigned ia = 0; ia < CONFIG_T::n_aggregators; ++ia) {
@@ -451,7 +451,7 @@ void distribute(nvtx_T const nvtx, arrays_T const &arrays, res_T res[CONFIG_T::n
     OutputResSetter<CONFIG_T, res_T> res_setter(res);
 
     typename CONFIG_T::aggr_t output_base[CONFIG_T::n_out_features * CONFIG_T::n_aggregators];
-    //#pragma HLS ARRAY_PARTITION variable=output_base complete
+    #pragma HLS ARRAY_PARTITION variable=output_base complete
 
     compute_output_base<CONFIG_T>(arrays, output_base);
 
@@ -501,7 +501,7 @@ void distribute_aggregate(nvtx_T const nvtx, prev_arrays_T const &prev_arrays, c
     typedef typename prev_layer_t::output_t data_T;
 
     typename prev_layer_t::aggr_t prev_output_base[prev_layer_t::n_out_features * prev_layer_t::n_aggregators];
-    //#pragma HLS ARRAY_PARTITION variable=prev_output_base complete
+    #pragma HLS ARRAY_PARTITION variable=prev_output_base complete
 
     compute_output_base<prev_layer_t>(prev_arrays, prev_output_base);
 
@@ -526,7 +526,7 @@ VerticesOuter:
                 break;
 
             data_T data[prev_layer_t::n_out_features];
-            //#pragma HLS ARRAY_PARTITION variable=data complete
+            #pragma HLS ARRAY_PARTITION variable=data complete
 
             SingleVertexResSetter<prev_layer_t, data_T> res_setter(data);
 

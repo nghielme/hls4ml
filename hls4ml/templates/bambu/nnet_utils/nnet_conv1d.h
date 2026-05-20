@@ -83,9 +83,9 @@ class BatchedDenseForConv1D : public nnet::Conv1DKernel<data_T, res_T, CONFIG_T>
         //#pragma HLS PIPELINE II = 1
         //#pragma HLS INLINE RECURSIVE
         data_T data_tmp[CONFIG_T::n_partitions][CONFIG_T::in_width * CONFIG_T::n_chan / CONFIG_T::n_partitions];
-        //#pragma HLS ARRAY_PARTITION variable=data_tmp complete dim=0
+        #pragma HLS ARRAY_PARTITION variable=data_tmp complete dim=0
         res_T res_tmp[CONFIG_T::n_partitions][CONFIG_T::out_width * CONFIG_T::n_filt / CONFIG_T::n_partitions];
-        //#pragma HLS ARRAY_PARTITION variable=res_tmp complete dim=0
+        #pragma HLS ARRAY_PARTITION variable=res_tmp complete dim=0
 
         #pragma clang loop unroll(full)
         for (int jj = 0; jj < CONFIG_T::n_partitions; jj++) {

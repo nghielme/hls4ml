@@ -45,8 +45,8 @@ void einsum_dense(
     data_T inp_tpose[CONFIG_T::n_free_data * CONFIG_T::n_contract * CONFIG_T::n_inplace];
     res_T out_tpose[CONFIG_T::n_free_data * CONFIG_T::n_free_kernel * CONFIG_T::n_inplace];
     res_T out_buffer[CONFIG_T::n_free_kernel];
-    //#pragma HLS ARRAY_PARTITION variable = inp_tpose complete
-    //#pragma HLS ARRAY_PARTITION variable = out_tpose complete
+    #pragma HLS ARRAY_PARTITION variable = inp_tpose complete
+    #pragma HLS ARRAY_PARTITION variable = out_tpose complete
 
     nnet::transpose<data_T, data_T, typename CONFIG_T::tpose_inp_conf>(data, inp_tpose);
 
@@ -85,8 +85,8 @@ einsum_dense(data_T data[CONFIG_T::n_free_data * CONFIG_T::n_contract * CONFIG_T
     data_T inp_tpose[CONFIG_T::n_free_data * CONFIG_T::n_contract * CONFIG_T::n_inplace];
     typename CONFIG_T::accum_t out_tpose[CONFIG_T::n_free_data * CONFIG_T::n_free_kernel * CONFIG_T::n_inplace];
 
-    //#pragma HLS ARRAY_PARTITION variable = inp_tpose complete
-    //#pragma HLS ARRAY_PARTITION variable = out_tpose complete
+    #pragma HLS ARRAY_PARTITION variable = inp_tpose complete
+    #pragma HLS ARRAY_PARTITION variable = out_tpose complete
 
     nnet::transpose<data_T, data_T, typename CONFIG_T::tpose_inp_conf>(data, inp_tpose);
 

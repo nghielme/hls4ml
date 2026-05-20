@@ -19,7 +19,7 @@ test_root_path = Path(__file__).parent
 def simple_model():
     """Simple Keras model for build testing"""
     model = Sequential()
-    model.add(Dense(3, input_shape=(2,)))
+    model.add(Dense(8, input_shape=(2,)))
     return model
 
 def count_files_with_extension(directory, extension):
@@ -121,7 +121,7 @@ def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, g
         clock_period=20,
     )
     hls_model_cosim.compile()
-    hls_model_cosim.build(synth=True, cosim=True, log_to_stdout=True)
+    hls_model_cosim.build(csim=False, synth=True, cosim=True, log_to_stdout=True)
 
     bridge_result = np.loadtxt(os.path.join(output_dir, 'tb_data', 'tb_output_predictions.dat'))
     cosim_result = np.loadtxt(os.path.join(output_dir, 'tb_data', 'rtl_cosim_results.log'))

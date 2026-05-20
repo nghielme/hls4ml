@@ -49,8 +49,8 @@ void layernorm_1d(data_T data[CONFIG_T::n_in / CONFIG_T::seq_len], res_T res[CON
                   typename CONFIG_T::scale_t scale[CONFIG_T::n_in / CONFIG_T::seq_len],
                   typename CONFIG_T::bias_t bias[CONFIG_T::n_in / CONFIG_T::seq_len]) {
     //#pragma HLS PIPELINE II=CONFIG_T::reuse_factor /// to be checked again
-    //#pragma HLS ARRAY_PARTITION variable=data complete
-    //#pragma HLS ARRAY_PARTITION variable=res complete
+    #pragma HLS ARRAY_PARTITION variable=data complete
+    #pragma HLS ARRAY_PARTITION variable=res complete
     int inv_range_inv = (int)1 << CONFIG_T::table_range_power2;
     typename CONFIG_T::table_t deno_inver = 0;
 #ifdef __HLS_SYN__
@@ -71,7 +71,7 @@ void layernorm_1d(data_T data[CONFIG_T::n_in / CONFIG_T::seq_len], res_T res[CON
     typename CONFIG_T::accum_t var, mean, diff;
     typename CONFIG_T::accum_t data_diff[dim];
 
-    //#pragma HLS ARRAY_PARTITION variable=data_diff complete
+    #pragma HLS ARRAY_PARTITION variable=data_diff complete
 
     const typename CONFIG_T::accum_t k_inv = 1.0 / dim;
 
@@ -113,10 +113,10 @@ void layernormalize(data_T data[CONFIG_T::n_in], res_T res[CONFIG_T::n_in],
     data_T in_val[dim];
     res_T outval[dim];
 
-    //#pragma HLS ARRAY_PARTITION variable=scale complete
-    //#pragma HLS ARRAY_PARTITION variable=bias complete
-    //#pragma HLS ARRAY_PARTITION variable=in_val complete
-    //#pragma HLS ARRAY_PARTITION variable=outval complete
+    #pragma HLS ARRAY_PARTITION variable=scale complete
+    #pragma HLS ARRAY_PARTITION variable=bias complete
+    #pragma HLS ARRAY_PARTITION variable=in_val complete
+    #pragma HLS ARRAY_PARTITION variable=outval complete
 
 LAYERNORM_SEQ_LOOP:
     for (int j = 0; j < CONFIG_T::seq_len; ++j) {

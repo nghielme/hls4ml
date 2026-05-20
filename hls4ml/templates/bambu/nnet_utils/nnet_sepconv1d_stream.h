@@ -20,14 +20,14 @@ void depthwise_conv_1d_encoded_cl(hls::stream<data_T> &data, hls::stream<res_T> 
         //#pragma HLS STREAM variable=data_window[i_out] depth=win_depth
     }
 
-    //#pragma HLS ARRAY_PARTITION variable=CONFIG_T::pixels complete
+    #pragma HLS ARRAY_PARTITION variable=CONFIG_T::pixels complete
 
     res_T res_pack;
     PRAGMA_DATA_PACK(res_pack)
     unsigned outputs_ready = 0;
 
     ap_uint<CONFIG_T::filt_width> pixel_idx[data_T::size / CONFIG_T::n_chan];
-    //#pragma HLS ARRAY_PARTITION variable=pixel_idx complete
+    #pragma HLS ARRAY_PARTITION variable=pixel_idx complete
 
 ReadInputWidth:
     for (unsigned i_iw = 0; i_iw < CONFIG_T::in_width / (data_T::size / CONFIG_T::n_chan); i_iw++) {
@@ -83,8 +83,8 @@ void pointwise_conv_1d_cl(hls::stream<data_T> &data, hls::stream<res_T> &res,
     assert(CONFIG_T::pad_left == 0 && CONFIG_T::pad_right == 0);
     assert(CONFIG_T::filt_width == 1);
 
-    //#pragma HLS ARRAY_PARTITION variable=weights complete
-    //#pragma HLS ARRAY_PARTITION variable=biases complete
+    #pragma HLS ARRAY_PARTITION variable=weights complete
+    #pragma HLS ARRAY_PARTITION variable=biases complete
 
 ReadInputWidth:
     for (unsigned i_iw = 0; i_iw < CONFIG_T::in_width / (data_T::size / CONFIG_T::n_chan); i_iw++) {

@@ -66,15 +66,15 @@ void lstm(bool reset_state, data_T data[CONFIG_T::n_in], res_T h_newstate[CONFIG
     typename CONFIG_T::accum_t inputacc_c[CONFIG_T::n_state];       // c-matrix (keras notation)
     typename CONFIG_T::accum_t s_actstate[CONFIG_T::n_state];
 
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate   complete
-    //#pragma HLS ARRAY_PARTITION variable=s_newstate   complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres       complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_state complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_ifo   complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_c     complete
-    //#pragma HLS ARRAY_PARTITION variable=inputacc_ifo complete
-    //#pragma HLS ARRAY_PARTITION variable=inputacc_c   complete
-    //#pragma HLS ARRAY_PARTITION variable=s_actstate   complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate   complete
+    #pragma HLS ARRAY_PARTITION variable=s_newstate   complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres       complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_state complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_ifo   complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_c     complete
+    #pragma HLS ARRAY_PARTITION variable=inputacc_ifo complete
+    #pragma HLS ARRAY_PARTITION variable=inputacc_c   complete
+    #pragma HLS ARRAY_PARTITION variable=s_actstate   complete
 
     nnet::dense<data_T, res_T, typename CONFIG_T::mult_config1>(data, tmpres, param, param_b);
     nnet::dense<data_T, res_T, typename CONFIG_T::mult_config2>(h_newstate, tmpres_state, param_r, param_br);
@@ -136,17 +136,17 @@ void lstm_static(bool reset_state, data_T data[CONFIG_T::n_in], res_T h_newstate
     typename CONFIG_T::accum_t inputacc_c[CONFIG_T::n_state];       // c-matrix (keras notation)
     typename CONFIG_T::accum_t s_actstate[CONFIG_T::n_state];
 
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate   complete
-    //#pragma HLS ARRAY_PARTITION variable=s_newstate   complete
-    //#pragma HLS ARRAY_PARTITION variable=h_state      complete
-    //#pragma HLS ARRAY_PARTITION variable=s_state      complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres       complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_state complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_ifo   complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_c     complete
-    //#pragma HLS ARRAY_PARTITION variable=inputacc_ifo complete
-    //#pragma HLS ARRAY_PARTITION variable=inputacc_c   complete
-    //#pragma HLS ARRAY_PARTITION variable=s_actstate   complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate   complete
+    #pragma HLS ARRAY_PARTITION variable=s_newstate   complete
+    #pragma HLS ARRAY_PARTITION variable=h_state      complete
+    #pragma HLS ARRAY_PARTITION variable=s_state      complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres       complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_state complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_ifo   complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_c     complete
+    #pragma HLS ARRAY_PARTITION variable=inputacc_ifo complete
+    #pragma HLS ARRAY_PARTITION variable=inputacc_c   complete
+    #pragma HLS ARRAY_PARTITION variable=s_actstate   complete
 
     if (reset_state) {
         #pragma clang loop unroll(full)
@@ -240,8 +240,8 @@ void lstm_stack(data_T data[CONFIG_T::n_sequence * CONFIG_T::n_in], res_T res[CO
     data_T data_in[CONFIG_T::n_in];
     bool reset_state = true;
 
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate complete
-    //#pragma HLS ARRAY_PARTITION variable=s_newstate complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate complete
+    #pragma HLS ARRAY_PARTITION variable=s_newstate complete
 
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_state; ii++) {
@@ -288,8 +288,8 @@ void lstm_stack(data_T data[CONFIG_T::n_sequence * CONFIG_T::n_in], h_T h_newsta
     data_T data_in[CONFIG_T::n_in];
     bool reset_state = false;
 
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate complete
-    //#pragma HLS ARRAY_PARTITION variable=s_newstate complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate complete
+    #pragma HLS ARRAY_PARTITION variable=s_newstate complete
 
     for (int iloop = 0; iloop < CONFIG_T::n_sequence; iloop++) {
         #pragma clang loop unroll(full)
@@ -324,8 +324,8 @@ void lstm_stack(hls::stream<data_T> &data_stream, hls::stream<res_T> &res_stream
 
     typename res_T::value_type h_newstate[CONFIG_T::n_state];
     typename res_T::value_type s_newstate[CONFIG_T::n_state];
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate complete
-    //#pragma HLS ARRAY_PARTITION variable=s_newstate complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate complete
+    #pragma HLS ARRAY_PARTITION variable=s_newstate complete
 
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_state; ii++) {
@@ -428,14 +428,14 @@ void gru(bool reset_state, data_T data[CONFIG_T::n_in], res_T h_newstate[CONFIG_
     typename CONFIG_T::accum_t inputacc_zr[CONFIG_T::n_state * 2]; // i,f,o matrices (keras notation)
     typename CONFIG_T::accum_t inputacc_h[CONFIG_T::n_state];      // c-matrix (keras notation)
 
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate      complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres          complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_state_zr complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_state_h  complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_zr       complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_h        complete
-    //#pragma HLS ARRAY_PARTITION variable=inputacc_zr     complete
-    //#pragma HLS ARRAY_PARTITION variable=inputacc_h      complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate      complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres          complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_state_zr complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_state_h  complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_zr       complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_h        complete
+    #pragma HLS ARRAY_PARTITION variable=inputacc_zr     complete
+    #pragma HLS ARRAY_PARTITION variable=inputacc_h      complete
 
     nnet::dense<data_T, typename CONFIG_T::accum_t, typename CONFIG_T::mult_config1>(data, tmpres, param, param_b);
     nnet::dense<res_T, typename CONFIG_T::accum_t, typename CONFIG_T::mult_config2>(h_newstate, tmpres_state_zr, param_zr,
@@ -505,15 +505,15 @@ void gru_static(bool reset_state, data_T data[CONFIG_T::n_in], res_T h_newstate[
     typename CONFIG_T::accum_t inputacc_zr[CONFIG_T::n_state * 2]; // i,f,o matrices (keras notation)
     typename CONFIG_T::accum_t inputacc_h[CONFIG_T::n_state];      // c-matrix (keras notation)
 
-    //#pragma HLS ARRAY_PARTITION variable=h_state         complete
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate      complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres          complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_state_zr complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_state_h  complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_zr       complete
-    //#pragma HLS ARRAY_PARTITION variable=tmpres_h        complete
-    //#pragma HLS ARRAY_PARTITION variable=inputacc_zr     complete
-    //#pragma HLS ARRAY_PARTITION variable=inputacc_h      complete
+    #pragma HLS ARRAY_PARTITION variable=h_state         complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate      complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres          complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_state_zr complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_state_h  complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_zr       complete
+    #pragma HLS ARRAY_PARTITION variable=tmpres_h        complete
+    #pragma HLS ARRAY_PARTITION variable=inputacc_zr     complete
+    #pragma HLS ARRAY_PARTITION variable=inputacc_h      complete
 
     if (reset_state) {
         #pragma clang loop unroll(full)
@@ -608,8 +608,8 @@ void gru_stack(data_T data[CONFIG_T::n_sequence * CONFIG_T::n_in], res_T res[CON
     data_T data_in[CONFIG_T::n_in];
     bool reset_state = true;
 
-    //#pragma HLS ARRAY_PARTITION variable=h_state complete
-    //#pragma HLS ARRAY_PARTITION variable=data_in complete
+    #pragma HLS ARRAY_PARTITION variable=h_state complete
+    #pragma HLS ARRAY_PARTITION variable=data_in complete
 
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_state; ii++) {
@@ -653,8 +653,8 @@ void gru_stack(data_T data[CONFIG_T::n_sequence * CONFIG_T::n_in], h_T h_state[C
     data_T data_in[CONFIG_T::n_in];
     bool reset_state = false;
 
-    //#pragma HLS ARRAY_PARTITION variable=h_state complete
-    //#pragma HLS ARRAY_PARTITION variable=data_in complete
+    #pragma HLS ARRAY_PARTITION variable=h_state complete
+    #pragma HLS ARRAY_PARTITION variable=data_in complete
     for (int iloop = 0; iloop < CONFIG_T::n_sequence; iloop++) {
         #pragma clang loop unroll(full)
         for (int j = 0; j < CONFIG_T::n_in; j++) {
@@ -688,7 +688,7 @@ void gru_stack(hls::stream<data_T> &data_stream, hls::stream<res_T> &res_stream,
                typename CONFIG_T::recurrent_bias_t param_br[CONFIG_T::n_state * 3]) {
 
     typename res_T::value_type h_newstate[CONFIG_T::n_state];
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate complete
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < CONFIG_T::n_state; ii++) {
         //#pragma HLS UNROLL
@@ -811,8 +811,8 @@ void bidirectional_stack(
     data_T data_in_back[CONFIG_T::n_in];
     bool reset_state = true;
 
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate complete
-    //#pragma HLS ARRAY_PARTITION variable=h_newstate_back complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate complete
+    #pragma HLS ARRAY_PARTITION variable=h_newstate_back complete
 
     #pragma clang loop unroll(full)
     for (int ii = 0; ii < (CONFIG_T::FORWARD_CONFIG::n_mult - 2) * CONFIG_T::FORWARD_CONFIG::n_state; ii++) {
