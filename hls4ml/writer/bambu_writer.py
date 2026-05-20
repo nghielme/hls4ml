@@ -387,7 +387,7 @@ class BambuWriter(Writer):
                     #      form goes through the lenient parser and is
                     #      accepted, while still letting --generate-interface=INFER
                     #      build the correct interface from the signature.
-                    for port in all_inputs + all_outputs:
+                    for port in [i.name for i in model_inputs] + [o.name for o in model_outputs]:
                         newline += indent + '#pragma HLS_interface mode=valid port={}\n'.format(port)
                     newline += pipeline_pragma
 
