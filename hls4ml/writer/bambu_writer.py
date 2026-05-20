@@ -333,6 +333,8 @@ class BambuWriter(Writer):
             # Add input/output type
             elif '// hls-fpga-machine-learning insert IO' in line:
                 newline = line
+                all_inputs = [i.name for i in model_inputs]
+                all_outputs = [o.name for o in model_outputs]
                 all_brams = [b.name for b in model_brams]
                 io_type = model.config.get_config_value('IOType')
 
@@ -352,20 +354,17 @@ class BambuWriter(Writer):
 
                 # Per-port `#pragma HLS interface` directives. Two changes
                 # vs. the old comma-list form:
-                #   - io_parallel emits NOTHING. Current Bambu rejects
-                #     `mode=valid` as "Invalid HLS interface mode"; the
-                #     valid-handshake interface is derived by
-                #     `--generate-interface=INFER` from the typed array
-                #     parameters in the function signature.
-                #   - io_stream emits one `mode=axis` line per port (Bambu
-                #     requires explicit AXIS pragmas; the comma-list form
-                #     is rejected by current InterfaceInfer).
+                #   - io_parallel: one `HLS_interface mode=valid` per port
+                #     (underscore form; comma-separated port lists are rejected).
+                #   - io_stream: one `mode=axis` per port when
+                #     `_emit_core_interface_pragmas` is True (BambuAccelerator
+                #     sets it False on the core; the wrapper owns the top IF).
                 # `_emit_core_interface_pragmas = False` suppresses the
                 # io_stream emission for a subclass that wraps this core
                 # in a different top-level and owns the interface there.
                 interface_pragmas = ''
                 if self._emit_core_interface_pragmas and io_type == 'io_stream':
-                    for port in [i.name for i in model_inputs] + [o.name for o in model_outputs]:
+                    for port in all_inputs + all_outputs:
                         interface_pragmas += f'{indent}#pragma HLS interface mode=axis port={port}\n'
 
                 if io_type == 'io_parallel':
