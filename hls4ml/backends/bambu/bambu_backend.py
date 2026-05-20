@@ -9,8 +9,8 @@ from warnings import warn
 import numpy as np
 
 from hls4ml.backends import FPGABackend
-from hls4ml.backends.bambu.bambu_types import BambuArrayVariableConverter
-from hls4ml.backends.fpga.fpga_types import APTypeConverter, HLSTypeConverter
+from hls4ml.backends.bambu.bambu_types import BambuArrayVariableConverter, BambuHLSTypeConverter
+from hls4ml.backends.fpga.fpga_types import APTypeConverter
 from hls4ml.model.attributes import ChoiceAttribute, ConfigurableAttribute, TypeAttribute
 from hls4ml.model.flow import register_flow
 from hls4ml.model.layers import (
@@ -82,7 +82,7 @@ partname_to_bambu = {
     # : "xc6vlx240t-1ff1156", 
 
     # 7-series
-    "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324", "family" : "Xilinx"}, # 7-series Artix! vsynth confirmed working, using as default for now
+    "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324", "family" : "Xilinx"}, # 7-series Artix; matches the entry in Bambu's `Available devices` listing
     # : "xc7vx330t-1ffg1157",
     # : "xc7vx485t-2ffg1761",
     # : "xc7vx690t-3ffg1930", 
@@ -420,10 +420,6 @@ class BambuBackend(FPGABackend):
         part_family = model.config.get_config_value("FPGAFamily")
 
         # Bambu-specific command/flags
-        BASE_COMMAND  = ['bambu', 
-                         os.path.join('firmware', f'{project_name}.cpp'), 
-                         f'--top-fname={project_name}'
-                        ]
         # `-ftemplate-depth=2048` is forwarded by Bambu directly to its
         # clang-16 front-end. The default 1024-deep template instantiation
         # limit is hit by `std::make_index_sequence<N>` in libstdc++ 4.9.4
@@ -440,6 +436,9 @@ class BambuBackend(FPGABackend):
         # See firmware/nnet_utils/nnet_activation.h:228 in hls4ml's bambu
         # templates for the actual `make_index_sequence` call site.
         CC_TEMPLATE_DEPTH = '-ftemplate-depth=2048'
+
+        BASE_COMMAND = ['bambu'] + self._get_hls_sources(project_name) + [f'--top-fname={self._get_top_fname(project_name)}']
+
         if os.environ.get('USE_BAMBU_AC_TYPES'):
             REQ_ARGS = ['-lm',
                         '--compiler=I386_CLANG16',
@@ -497,13 +496,36 @@ class BambuBackend(FPGABackend):
                 raise RuntimeError(
                 f'C++ testbench execution failed:\nSTDOUT:\n{ret.stdout}\nSTDERR:\n{ret.stderr}'
             )
+                
+        if synth:
+            clock_period = model.config.get_config_value('ClockPeriod')
+            part_name = model.config.get_config_value('Part') # Bambu uses its own 'device name' which does NOT always coincide with part name
+            device_name = partname_to_bambu.get(part_name, {}).get("device_name", None)
+            if device_name is None:
+                warn(
+                    f"WARNING: Part name {part_name} has no registered mapping to a Bambu --device-name. "
+                    f"Using '--device-name={part_name}'. "
+                    "(See valid Bambu device names by running Bambu with High Verbosity flag '-v4')"
+                )
+                device_name = part_name
+            CMD_ARGS += [f'--device-name={device_name}', f'--clock-period={clock_period}']
             
         ### COSIM ###
         if cosim:
             if not synth:
                 raise ValueError("To run RTL cosimulation, C/RTL synthesis must be run.")
-            # --simulator=<SIMULATOR> will be selected by default by Bambu
-            CMD_ARGS += [f'--generate-tb={project_name}_test.cpp', '--simulate', '-DRTL_SIM']
+            CMD_ARGS += [f'--generate-tb={self._get_cosim_testbench(project_name)}', '--simulate', '-DRTL_SIM']
+
+            # Force Verilator for NanoXplore parts. Bambu's default
+            # simulator selection picks a NanoXplore-native flow whose
+            # XML device files fail to parse on the current toolchain
+            # (`Error during XML parsing of device files`). Verilator is
+            # toolchain-agnostic and works for cosim regardless of the
+            # target FPGA family.
+            part_name = model.config.get_config_value('Part')
+            family = partname_to_bambu.get(part_name, {}).get("family", None)
+            if family == 'NanoXplore':
+                CMD_ARGS += ['--simulator=VERILATOR']
 
         ### VALIDATION ###
         if validation:
@@ -521,18 +543,7 @@ class BambuBackend(FPGABackend):
             if not cosim:
                 raise ValueError("To synthesize for specific part in Bambu, RTL cosimulation must be run.")
 
-            clock_period = model.config.get_config_value('ClockPeriod')
-            part_name = model.config.get_config_value('Part') # Bambu uses its own 'device name' which does NOT always coincide with part name
-            device_name = partname_to_bambu.get(part_name, {}).get("device_name", None)
-            if device_name is None:
-                warn(
-                    f"WARNING: Part name {part_name} has no registered mapping to a Bambu --device-name. "
-                    f"Using '--device-name={part_name}'. "
-                    "(See valid Bambu device names by running Bambu with High Verbosity flag '-v4')"
-                )
-                device_name = part_name
-
-            CMD_ARGS += ['--evaluation', f'--device-name={device_name}', f'--clock-period={clock_period}']
+            CMD_ARGS += ['--evaluation']
             
         ### FIFO_OPT ### 
         if fifo_opt:
@@ -633,7 +644,19 @@ class BambuBackend(FPGABackend):
             result.update(parse_bambu_report(project_dir, part_family))
 
             return result
-        
+
+    def _get_hls_sources(self, project_name):
+        """Return the list of C++ source files to pass to Bambu."""
+        return [os.path.join('firmware', f'{project_name}.cpp')]
+
+    def _get_top_fname(self, project_name):
+        """Return the top-level function name for Bambu synthesis."""
+        return project_name
+
+    def _get_cosim_testbench(self, project_name):
+        """Return the testbench filename for Bambu RTL co-simulation."""
+        return f'{project_name}_test.cpp'
+
     def _build_testbench_exe(self, model):
         ret = subprocess.run(
             ['bash', 'build_tb_exe.sh'],
@@ -650,11 +673,15 @@ class BambuBackend(FPGABackend):
     def _final_report_copying_code(self, family):
         """Aggregate final reports in one directory based on Part Family/Software used"""
         if family == 'Xilinx':
+            # Bambu's Vivado-flow output directory has moved across releases
+            # (`HLS_output/Synthesis/vivado_flow` in older versions,
+            # `HLS_output/xilinx/flow_backend` in current). Search the full
+            # HLS_output tree so the script keeps working across versions.
             return(
                 'src_root="HLS_output/xilinx/flow_backend"\n'
                 'dst_root="vivado_reports"\n'
                 'mkdir -p "$dst_root"\n'
-                'find "$src_root" -type f \( -iname "*.rpt" -o -iname "*.xml" \) -exec cp -p {} "$dst_root"/ \;'
+                r'find "$src_root" -type f \( -iname "*.rpt" -o -iname "*.xml" \) -exec cp -p {} "$dst_root"/ \;'
             )
         else: # TODO: Add more parsing code for different families/softwares
             return ""
@@ -1113,7 +1140,7 @@ class BambuBackend(FPGABackend):
     def init_garnet(self, layer):
         reuse_factor = layer.attributes['reuse_factor']
 
-        var_converter = BambuArrayVariableConverter(type_converter=HLSTypeConverter(precision_converter=APTypeConverter()))
+        var_converter = BambuArrayVariableConverter(type_converter=BambuHLSTypeConverter(precision_converter=APTypeConverter()))
 
         # A bit controversial but we are going to set the partitioning of the input here
         in_layer = layer.model.graph[layer.inputs[0]]

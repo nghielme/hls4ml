@@ -1,6 +1,7 @@
-from hls4ml.backends.fpga.fpga_types import APTypeConverter, HLSTypeConverter, StaticWeightVariableConverter
+from hls4ml.backends.fpga.fpga_types import APTypeConverter, StaticWeightVariableConverter
 from hls4ml.backends.bambu.bambu_types import (
     BambuArrayVariableConverter,
+    BambuHLSTypeConverter,
     BambuInplaceArrayVariableConverter,
     BambuInplaceStreamVariableConverter,
     BambuStreamVariableConverter,
@@ -11,7 +12,7 @@ from hls4ml.model.types import InplaceTensorVariable
 
 class TransformTypes(GlobalOptimizerPass):
     def __init__(self):
-        self.type_converter = HLSTypeConverter(precision_converter=APTypeConverter())
+        self.type_converter = BambuHLSTypeConverter(precision_converter=APTypeConverter())
         self.array_var_converter = BambuArrayVariableConverter(type_converter=self.type_converter)
         self.inplace_array_var_converter = BambuInplaceArrayVariableConverter(type_converter=self.type_converter)
         self.stream_var_converter = BambuStreamVariableConverter(type_converter=self.type_converter)

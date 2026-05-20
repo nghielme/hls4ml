@@ -30,6 +30,13 @@ class BambuWriter(Writer):
     def _should_emit_array_partition_pragma(cls):
         # Default to enabled to preserve behavior unless explicitly disabled.
         return cls._env_flag_enabled('USE_BAMBU_ARRAY_PARTITION', True)
+      
+    # Whether the top-level core function should emit its own
+    # `#pragma HLS interface` lines. A subclass that wraps this core inside
+    # a different top-level (and owns the AXI/AXIS interface there) sets
+    # this to False so InterfaceInfer doesn't see two competing
+    # declarations on the same port.
+    _emit_core_interface_pragmas = True
 
     def print_array_to_cpp(self, var, odir, namespace=None, write_txt_file=True):
         """Write a weights array to C++ header files.
@@ -61,10 +68,17 @@ class BambuWriter(Writer):
 
         if write_txt_file:
             h_file.write('#ifndef __SYNTHESIS__\n')
-            h_file.write(var.definition_cpp() + ';\n')
+            # `static` (internal linkage) so each translation unit that
+            # includes this weight header gets its own private copy. With
+            # the BambuAccelerator wrapper inlining the layer pipeline,
+            # both myproject.cpp and myproject_float.cpp include
+            # parameters.h; without `static` they collide at link time
+            # ("multiple definition of `w2'").
+            h_file.write('static ' + var.definition_cpp() + ';\n')
             h_file.write('#else\n')
-
-        h_file.write(var.definition_cpp() + ' = {')
+            h_file.write('static const ' + var.definition_cpp() + ' = {')
+        else:
+            h_file.write(var.definition_cpp() + ' = {')
 
         # fill c++ array.
         # not including internal brackets for multidimensional case
@@ -160,6 +174,109 @@ class BambuWriter(Writer):
 
         with open(header_path, 'w') as header:
             header.writelines(rewritten)
+            
+    # Helpers reused by `write_project_cpp` and (in a forthcoming subclass)
+    # by a wrapper writer that emits a different top-level function around
+    # this core. The first three are consumed below; the last three
+    # (`_emit_core_*`) are forward-looking infrastructure for the wrapper.
+
+    def _emit_load_weights_block(self, model, indent='    '):
+        """Emit the `#ifndef __BAMBU__` weight-loading block; '' if disabled."""
+        if not model.config.get_writer_config()['WriteWeightsTxt']:
+            return ''
+        out = '#ifndef __BAMBU__\n'
+        out += f'{indent}static bool loaded_weights = false;\n'
+        out += f'{indent}if (!loaded_weights) {{\n'
+        for layer in model.get_layers():
+            for w in layer.get_weights():
+                if w.weight_class == 'CompressedWeightVariable':
+                    out += indent + '    nnet::load_compressed_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
+                        w.type.name, w.nonzeros, w.name, w.name
+                    )
+                elif w.weight_class == 'ExponentWeightVariable':
+                    out += indent + '    nnet::load_exponent_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
+                        w.type.name, w.data_length, w.name, w.name
+                    )
+                else:
+                    out += indent + '    nnet::load_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
+                        w.type.name, w.data_length, w.name, w.name
+                    )
+        out += '        loaded_weights = true;'
+        out += '    }\n'
+        out += '#endif'
+        return out
+
+    def _emit_internal_stream_decls(self, model, indent='    '):
+        """Emit declarations for every non-input/output per-layer variable.
+
+        Bambu's DATAFLOW requires every local stream to be declared before
+        any sub-function call in the top-function body, so they live in the
+        same block as the layer calls.
+        """
+        model_inputs = model.get_input_variables()
+        model_outputs = model.get_output_variables()
+        out = ''
+        for layer in model.get_layers():
+            for var in layer.get_variables():
+                if var in model_inputs or var in model_outputs:
+                    continue
+                def_cpp = var.definition_cpp()
+                if def_cpp is None:
+                    continue
+                out += f'{indent}{def_cpp};\n'
+                if var.pragma:
+                    out += f'{indent}{self._make_array_pragma(var)}\n\n'
+        return out
+
+    def _emit_layer_calls(self, model, indent='    '):
+        """Emit the per-layer `function_cpp` calls."""
+        out = ''
+        for layer in model.get_layers():
+            func = layer.get_attr('function_cpp', None)
+            if not func:
+                continue
+            if not isinstance(func, (list, set)):
+                func = [func]
+            if len(func) == 1:
+                out += f'{indent}{func[0]} // {layer.name}\n'
+            else:
+                out += f'{indent}// {layer.name}\n'
+                for entry in func:
+                    out += f'{indent}{entry}\n'
+            if model.config.trace_output and layer.get_attr('trace', False):
+                out += '#ifndef __SYNTHESIS__\n'
+                for var in layer.get_variables():
+                    out += '{}nnet::save_layer_output<{}>({}, "{}", {});\n'.format(
+                        indent, var.type.name, var.name, layer.name, var.size_cpp()
+                    )
+                out += '#endif\n'
+            out += '\n'
+        return out
+
+    def _emit_core_io_pragma(self, model, indent='    '):
+        """Return `#pragma HLS DATAFLOW` for io_stream, empty otherwise.
+
+        Used by a wrapper top-level that calls into this core: the wrapper's
+        DATAFLOW pragma is what makes the per-layer streams flow concurrently.
+        """
+        io_type = model.config.get_config_value('IOType')
+        if io_type != 'io_stream':
+            return ''
+        return f'{indent}#pragma HLS DATAFLOW\n'
+
+    def _emit_core_input_declarations(self, model, indent='    '):
+        """Emit local declarations for each model input variable."""
+        out = ''
+        for inp in model.get_input_variables():
+            out += f'{indent}{inp.definition_cpp()};\n'
+        return out
+
+    def _emit_core_output_declarations(self, model, indent='    '):
+        """Emit local declarations for each model output variable."""
+        out = ''
+        for o in model.get_output_variables():
+            out += f'{indent}{o.definition_cpp()};\n'
+        return out
 
     def write_project_cpp(self, model):
         """Write the main architecture source file (myproject.cpp)
@@ -211,52 +328,45 @@ class BambuWriter(Writer):
                     newline += '}\n'
 
             elif '// hls-fpga-machine-learning insert load weights' in line:
-                newline = line
-                if model.config.get_writer_config()['WriteWeightsTxt']:
-                    newline += '#ifndef __BAMBU__\n'
-                    newline += '    static bool loaded_weights = false;\n'
-                    newline += '    if (!loaded_weights) {\n'
-
-                    for layer in model.get_layers():
-                        for w in layer.get_weights():
-                            if w.weight_class == 'CompressedWeightVariable':
-                                newline += (
-                                    indent
-                                    + '    nnet::load_compressed_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
-                                        w.type.name, w.nonzeros, w.name, w.name
-                                    )
-                                )
-                            elif w.weight_class == 'ExponentWeightVariable':
-                                newline += (
-                                    indent
-                                    + '    nnet::load_exponent_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
-                                        w.type.name, w.data_length, w.name, w.name
-                                    )
-                                )
-                            else:
-                                newline += indent + '    nnet::load_weights_from_txt<{}, {}>({}, "{}.txt");\n'.format(
-                                    w.type.name, w.data_length, w.name, w.name
-                                )
-
-                    newline += '        loaded_weights = true;'
-                    newline += '    }\n'
-                    newline += '#endif'
+                newline = line + self._emit_load_weights_block(model)
 
             # Add input/output type
             elif '// hls-fpga-machine-learning insert IO' in line:
                 newline = line
-                all_inputs = [i.name for i in model_inputs]
-                all_outputs = [o.name for o in model_outputs]
                 all_brams = [b.name for b in model_brams]
                 io_type = model.config.get_config_value('IOType')
 
                 pipeline_style = model.config.pipeline_style
                 pipeline_ii = model.config.pipeline_ii
-                pipeline_pragma = indent + f'//#pragma HLS {pipeline_style.upper()}'
+                # PIPELINE stays commented out: Bambu's default II=1 isn't
+                # achievable for the layer pipeline (`Function pipelining
+                # not possible with II=1`, observed minII=2 maxII=4).
+                # DATAFLOW (io_stream) IS activated — io_stream layers need
+                # it to flow concurrently as separate tasks.
+                pragma_prefix = '//' if pipeline_style == 'pipeline' else ''
+                pipeline_pragma = indent + f'{pragma_prefix}#pragma HLS {pipeline_style.upper()}'
                 if pipeline_style == 'pipeline' and pipeline_ii is not None:
                     pipeline_pragma += f' II={pipeline_ii}\n'
                 else:
                     pipeline_pragma += '\n'
+
+                # Per-port `#pragma HLS interface` directives. Two changes
+                # vs. the old comma-list form:
+                #   - io_parallel emits NOTHING. Current Bambu rejects
+                #     `mode=valid` as "Invalid HLS interface mode"; the
+                #     valid-handshake interface is derived by
+                #     `--generate-interface=INFER` from the typed array
+                #     parameters in the function signature.
+                #   - io_stream emits one `mode=axis` line per port (Bambu
+                #     requires explicit AXIS pragmas; the comma-list form
+                #     is rejected by current InterfaceInfer).
+                # `_emit_core_interface_pragmas = False` suppresses the
+                # io_stream emission for a subclass that wraps this core
+                # in a different top-level and owns the interface there.
+                interface_pragmas = ''
+                if self._emit_core_interface_pragmas and io_type == 'io_stream':
+                    for port in [i.name for i in model_inputs] + [o.name for o in model_outputs]:
+                        interface_pragmas += f'{indent}#pragma HLS interface mode=axis port={port}\n'
 
                 if io_type == 'io_parallel':
                     for i in model_inputs:
@@ -278,50 +388,19 @@ class BambuWriter(Writer):
                     #      accepted, while still letting --generate-interface=INFER
                     #      build the correct interface from the signature.
                     for port in all_inputs + all_outputs:
-                        newline += indent + '#pragma HLS_interface mode=valid port={}\n'.format(port)
+                        newline += indent + '#pragma HLS interface mode=valid port={}\n'.format(port)
                     newline += pipeline_pragma
 
                 if io_type == 'io_stream':
-                    newline += indent + '#pragma HLS interface mode=axis port={},{} \n'.format(
-                        ','.join(all_inputs), ','.join(all_outputs)
-                    )
+                    newline += interface_pragmas
                     if all_brams:
                         newline += indent + '//#pragma HLS INTERFACE bram port={} \n'.format(','.join(all_brams))
                     newline += pipeline_pragma
 
             elif '// hls-fpga-machine-learning insert layers' in line:
                 newline = line + '\n'
-                for layer in model.get_layers():
-                    vars = layer.get_variables()
-                    for var in vars:
-                        if var not in model_inputs and var not in model_outputs:
-                            def_cpp = var.definition_cpp()
-                            if def_cpp is not None:
-                                newline += '    ' + def_cpp + ';\n'
-                                if var.pragma:
-                                    if self._should_emit_array_partition_pragma():
-                                        newline += '    ' + self._make_array_pragma(var) + '\n'
-                                    newline += '\n'
-                for layer in model.get_layers():
-                    func = layer.get_attr('function_cpp', None)
-                    if func:
-                        if not isinstance(func, (list, set)):
-                            func = [func]
-                        if len(func) == 1:
-                            newline += '    ' + func[0] + ' // ' + layer.name + '\n'
-                        else:
-                            newline += '    // ' + layer.name + '\n'
-                            for line in func:
-                                newline += '    ' + line + '\n'
-                        if model.config.trace_output and layer.get_attr('trace', False):
-                            vars = layer.get_variables()
-                            newline += '#ifndef __SYNTHESIS__\n'
-                            for var in vars:
-                                newline += '    nnet::save_layer_output<{}>({}, "{}", {});\n'.format(
-                                    var.type.name, var.name, layer.name, var.size_cpp()
-                                )
-                            newline += '#endif\n'
-                        newline += '\n'
+                newline += self._emit_internal_stream_decls(model)
+                newline += self._emit_layer_calls(model)
 
             # Just copy line
             else:
