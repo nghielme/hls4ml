@@ -28,7 +28,7 @@ PIDS=()
 for g in "${graph_project_names[@]}"; do
     SRC_FILE="${g}/firmware/${ORIGINAL_PROJECT}_${g}.cpp"
     OBJ_FILE="${ORIGINAL_PROJECT}_${g}.o"
-    AC_TYPES_PATH="-I${BASEDIR}/${g}/firmware/ac_types/"
+    AC_TYPES_PATH="-I${BASEDIR}/${g}/firmware/ac_types/include"
     (
         ${CC} ${CFLAGS} ${AC_TYPES_PATH} -D WEIGHTS_DIR="${WEIGHTS_DIR}" -c "${BASEDIR}/${SRC_FILE}" -o "${OBJ_FILE}"
     ) &
@@ -41,7 +41,7 @@ for pid in "${PIDS[@]}"; do
     wait $pid
 done
 
-AC_TYPES_PATH="-I${BASEDIR}/${graph_project_names[@]: -1}/firmware/ac_types/"
+AC_TYPES_PATH="-I${BASEDIR}/${graph_project_names[@]: -1}/firmware/ac_types/include"
 
 ${CC} ${CFLAGS} ${INCFLAGS} ${AC_TYPES_PATH} -c "${PROJECT}_bridge.cpp" -o ${PROJECT}_bridge.o
 ${CC} ${CFLAGS} ${INCFLAGS} ${AC_TYPES_PATH} -shared "${OBJECT_FILES[@]}" ${PROJECT}_bridge.o -o "${OUTPUT_DIR}/${PROJECT}-${LIB_STAMP}.so"
