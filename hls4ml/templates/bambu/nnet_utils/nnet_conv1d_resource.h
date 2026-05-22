@@ -112,9 +112,11 @@ PartitionLoop:
           #pragma clang loop unroll(full)
           for (unsigned i_res = 0; i_res < mult_n_out; i_res++) {
             //#pragma HLS UNROLL
-            res[i_pxl * mult_n_out + i_res] =
+   
               cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_pxl][i_res]);
-        }
+            res[(i_part * CONFIG_T::n_pixels + i_pxl) * mult_n_out + i_res] =
+                    cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_pxl][i_res]);
+       }
     }
     }
 }
