@@ -90,18 +90,32 @@ PartitionLoop:
             }
         }
 
+        //PixelResultLoop:
+        // #pragma clang loop unroll(full)
+        // for (unsigned i_pxl = 0; i_pxl < CONFIG_T::n_pixels; i_pxl++) {
+        // //#pragma HLS UNROLL
+        // // Cast to "res_t" type
+        // ResultLoop:
+        //     #pragma clang loop unroll(full)
+        //     for (unsigned i_res = 0; i_res < mult_n_out; i_res++) {
+        //         //#pragma HLS UNROLL
+        //         *(res++) = cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_pxl][i_res]);
+        //     }
+        // }
+
     PixelResultLoop:
         #pragma clang loop unroll(full)
         for (unsigned i_pxl = 0; i_pxl < CONFIG_T::n_pixels; i_pxl++) {
-        //#pragma HLS UNROLL
-        // Cast to "res_t" type
+    // Cast to "res_t" type
+
         ResultLoop:
-            #pragma clang loop unroll(full)
-            for (unsigned i_res = 0; i_res < mult_n_out; i_res++) {
-                //#pragma HLS UNROLL
-                *(res++) = cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_pxl][i_res]);
-            }
+          #pragma clang loop unroll(full)
+          for (unsigned i_res = 0; i_res < mult_n_out; i_res++) {
+            //#pragma HLS UNROLL
+            res[i_pxl * mult_n_out + i_res] =
+              cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_pxl][i_res]);
         }
+    }
     }
 }
 
