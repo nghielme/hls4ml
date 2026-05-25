@@ -31,9 +31,8 @@ void conv_1d_resource_cl(data_T data[CONFIG_T::in_width * CONFIG_T::n_chan],
     #pragma HLS ARRAY_PARTITION variable=acc complete dim=0
 
 PartitionLoop:
-    #pragma clang loop unroll(full)
+    //#pragma clang loop unroll(full) We don't want this loop unrolled
     for (unsigned i_part = 0; i_part < CONFIG_T::n_partitions; i_part++) {
-        //#pragma HLS UNROLL // We don't want this loop unrolled
 
         CONFIG_T::template fill_buffer<data_T, CONFIG_T>::fill_buffer(data, data_buf, i_part);
 
@@ -91,18 +90,32 @@ PartitionLoop:
             }
         }
 
+        //PixelResultLoop:
+        // #pragma clang loop unroll(full)
+        // for (unsigned i_pxl = 0; i_pxl < CONFIG_T::n_pixels; i_pxl++) {
+        // //#pragma HLS UNROLL
+        // // Cast to "res_t" type
+        // ResultLoop:
+        //     #pragma clang loop unroll(full)
+        //     for (unsigned i_res = 0; i_res < mult_n_out; i_res++) {
+        //         //#pragma HLS UNROLL
+        //         *(res++) = cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_pxl][i_res]);
+        //     }
+        // }
+
     PixelResultLoop:
         #pragma clang loop unroll(full)
         for (unsigned i_pxl = 0; i_pxl < CONFIG_T::n_pixels; i_pxl++) {
-        //#pragma HLS UNROLL
-        // Cast to "res_t" type
+    // Cast to "res_t" type
+
         ResultLoop:
-            #pragma clang loop unroll(full)
-            for (unsigned i_res = 0; i_res < mult_n_out; i_res++) {
-                //#pragma HLS UNROLL
-                *(res++) = cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_pxl][i_res]);
-            }
-        }
+          #pragma clang loop unroll(full)
+          for (unsigned i_res = 0; i_res < mult_n_out; i_res++) {
+            //#pragma HLS UNROLL
+            res[(i_part * CONFIG_T::n_pixels + i_pxl) * mult_n_out + i_res] =
+                    cast<data_T, res_T, typename CONFIG_T::mult_config>(acc[i_pxl][i_res]);
+       }
+    }
     }
 }
 
