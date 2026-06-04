@@ -21,6 +21,19 @@ def _coerce_value(raw):
 
 
 def _parse_result_file(path):
+    """Parse a single bambu_results XML file produced by Bambu 2026.06+.
+
+    The reference schema (PandA 2026.06) has root tag ``<application>`` with:
+    - meta as root attributes: ``args``, ``version``, ``benchmark``, ``timestamp``
+    - ``<resources>`` child: flat attributes per metric (LUTS, REGISTERS, DSPS,
+      BRAMS, DRAMS, SLICES, FE, IOPINS, POWER, FREQUENCY, SLACK, DELAY, …).
+      Attribute names are vendor-specific (Xilinx has SLICES; NanoXplore has FE).
+      Absent when P&R fails (e.g. NanoXplore routing errors) — tolerated.
+    - ``<evaluation>`` child (top-level): CYCLES, AREA, PERIOD, FREQUENCY, …
+    - ``<timing>`` child: ``<simulation>`` or ``<evaluation>`` sub-element each
+      containing ``<run>`` text nodes with per-execution cycle counts.
+    - ``<hls_results>`` child: per-function scheduling info (not parsed here).
+    """
     tree = ET.parse(path)
     root = tree.getroot()
 
@@ -34,19 +47,27 @@ def _parse_result_file(path):
 
     metrics = {}
 
-    # --- Resource metrics (REGISTERS, SLACK, LUTS, etc.) ---
+    # Resource metrics — absent when P&R fails, silently skipped.
     resources = root.find('resources')
     if resources is not None:
         for key, val in resources.attrib.items():
             metrics[key] = _coerce_value(val)
 
-    # --- Timing / simulation metrics ---
-    # <timing><evaluation return_value="0"><run>X</run></evaluation></timing>
+    # Top-level <evaluation> carries CYCLES, AREA, PERIOD, FREQUENCY, … in 2026.06.
+    # Use setdefault so <resources> values (FREQUENCY, REGISTERS, …) take precedence
+    # when both are present (resources come from synthesis, evaluation may repeat them).
+    evaluation = root.find('evaluation')
+    if evaluation is not None:
+        for key, val in evaluation.attrib.items():
+            metrics.setdefault(key, _coerce_value(val))
+
+    # Cycle counts from <timing>/<simulation|evaluation>/<run> text nodes.
+    # 2026.06 uses <simulation>; older PandA used <evaluation>; try both.
     timing = root.find('timing')
     if timing is not None:
-        evaluation = timing.find('evaluation')
-        if evaluation is not None:
-            runs = [_coerce_value(r.text) for r in evaluation.findall('run')]
+        timing_node = timing.find('simulation') or timing.find('evaluation')
+        if timing_node is not None:
+            runs = [_coerce_value(r.text) for r in timing_node.findall('run')]
             if runs:
                 metrics['Total cycles']         = sum(runs)
                 metrics['Number of executions'] = len(runs)
@@ -56,11 +77,28 @@ def _parse_result_file(path):
 
 
 def parse_bambu_report(hls_dir, part_family):
-    """Parse bambu_results XML files from ``hls_dir``.
-    If target is from Xilinx, parse Vivado reports.
-    Must be extended to parse reports from differing manufacturers.
+    """Parse Bambu result files from ``hls_dir``.
 
-    Returns a dictionary with the parsed entries.
+    Parses the ``bambu_results*.xml`` file(s) produced by Bambu 2026.06
+    (root ``<application>``, ``<resources>`` attrs, ``<evaluation>`` attrs,
+    ``<timing>/<simulation|evaluation>/<run>`` cycle counts).  For Xilinx
+    targets, also reads the Vivado implementation, timing and power reports.
+
+    Args:
+        hls_dir: directory containing ``bambu_results*.xml`` and, for Xilinx
+            targets, the Vivado report tree.
+        part_family: ``"Xilinx"`` or ``"NanoXplore"`` (or ``None``).  Controls
+            whether Vivado reports are parsed.
+
+    Returns:
+        dict with zero or more of the following keys:
+        - ``'BambuMetrics'``: dict of resource/timing metrics from the XML
+          (e.g. LUTS, REGISTERS, DSPS, CYCLES, Total cycles, …).  Absent
+          when no ``bambu_results*.xml`` is found or P&R failed and the
+          file contains no ``<resources>`` block (NanoXplore routing errors).
+        - ``'CSimResults'``, ``'CosimResults'``: parsed C-sim / RTL-cosim logs.
+        - ``'ImplementationReport'``, ``'TimingReport'``, ``'PowerReport'``:
+          Vivado reports (Xilinx only).
     """
     result = {}
 
