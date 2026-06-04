@@ -12,6 +12,8 @@ my-hls-test
 docs/_build
 docs/autodoc/*
 test/pytest/*_test_*
+test/pytest/ci-template-old.yml
+test/pytest/pytests.yml
 *~
 *.ipynb_checkpoints/
 *.bak
