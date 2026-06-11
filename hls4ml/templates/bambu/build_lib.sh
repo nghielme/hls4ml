@@ -2,7 +2,6 @@
 set -euo pipefail
 
 APPIMAGE="bambu"
-FALLBACK_CC="g++"
 
 TMPINFO=""
 MOUNT_PID=""
@@ -14,8 +13,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Try to mount to Bambu AppImage to access C++ compiler
-if command -v "$APPIMAGE" >/dev/null 2>&1; then
+# 1. Use BAMBU_SQUASHFS_ROOT if set by setup-bambu.sh (extracted AppImage)
+if [ -n "${BAMBU_SQUASHFS_ROOT:-}" ] && [ -d "$BAMBU_SQUASHFS_ROOT" ]; then
+    MOUNT_DIR="$BAMBU_SQUASHFS_ROOT"
+fi
+
+# 2. Try --appimage-mount (actual AppImage on PATH)
+if [ -z "$MOUNT_DIR" ] && command -v "$APPIMAGE" >/dev/null 2>&1; then
     TMPINFO="$(mktemp)"
     "$APPIMAGE" --appimage-mount >"$TMPINFO" 2>&1 &
     MOUNT_PID=$!
@@ -34,13 +38,11 @@ if command -v "$APPIMAGE" >/dev/null 2>&1; then
     fi
 fi
 
-# If no Bambu AppImage: check for extracted AppImage (squashfs-root)
+# 3. Derive from extracted squashfs via which bambu → up 3 dirs
 if [ -z "$MOUNT_DIR" ]; then
     BIN_PATH="$(which "$APPIMAGE" 2>/dev/null || true)"
-
     if [ -n "$BIN_PATH" ]; then
         APPDIR="$(dirname "$(dirname "$(dirname "$BIN_PATH")")")"
-
         if [ -x "$APPDIR/usr/bin/clang++-16" ] || \
            [ -x "$APPDIR/usr/compilers/clang-16/bin/clang++-16" ]; then
             MOUNT_DIR="$APPDIR"
@@ -48,9 +50,7 @@ if [ -z "$MOUNT_DIR" ]; then
     fi
 fi
 
-# If Bambu provides Clang++-16, use it. The AppImage layout has changed
-# across releases (older versions ship clang++-16 under usr/bin/, newer ones
-# under usr/compilers/clang-16/bin/), so probe both known locations.
+# Locate clang++-16 — required, no fallback to g++
 CC=""
 if [ -n "$MOUNT_DIR" ]; then
     for candidate in \
@@ -61,8 +61,8 @@ if [ -n "$MOUNT_DIR" ]; then
     done
 fi
 if [ -z "$CC" ]; then
-    echo "Bambu AppImage clang++-16 not detected. Using fallback compiler."
-    CC="$FALLBACK_CC"
+    echo "ERROR: Bambu clang++-16 not found. Set BAMBU_SQUASHFS_ROOT or ensure bambu AppImage is on PATH." >&2
+    exit 1
 fi
 
 echo "Using compiler: $($CC --version | head -n1)"
