@@ -18,6 +18,7 @@
   before_script:
     - source /home/hls4ml/miniforge/etc/profile.d/conda.sh
     - conda activate "$CONDA_ENV"
+    - source /opt/intel/oneapi/setvars.sh --force
     - source setup-bambu.sh
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - git submodule update --init --recursive hls4ml/templates/catapult/
@@ -39,8 +40,6 @@
     - echo "apptainer exec /cvmfs/projects.cern.ch/hls4ml/vitis/${VITIS_VERSION} vitis-run \"\$@\"" >> "cmd_vitis_${VITIS_VERSION}/vitis-run"
     - chmod +x "cmd_vitis_${VITIS_VERSION}/vitis-run"
     - export PATH="$PWD/cmd_vitis_${VITIS_VERSION}:$PATH"
-
-    - source /opt/intel/oneapi/setvars.sh --force
   script:
     - cd "$CI_PROJECT_DIR/test/pytest"
     - pytest $PYTESTFILE -rA --cov-report xml --cov-report term --cov=hls4ml --junitxml=report.xml --randomly-seed=42 --randomly-dont-reorganize --randomly-dont-reset-seed
