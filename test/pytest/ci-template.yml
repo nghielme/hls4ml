@@ -20,6 +20,7 @@
     - conda activate "$CONDA_ENV"
     - source /opt/intel/oneapi/setvars.sh --force
     - source setup-bambu.sh
+    - unset IFS
     - git config --global --add safe.directory "$CI_PROJECT_DIR"
     - git submodule update --init --recursive hls4ml/templates/catapult/
     - git submodule update --init --recursive hls4ml/templates/bambu/
