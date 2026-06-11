@@ -25,20 +25,20 @@
     - if [ "$EXAMPLEMODEL" = "1" ]; then git submodule update --init example-models; fi
     - pip install ".${EXTRA_DEPS}"
 
-    # Vivado HLS: prefer CVMFS-pinned version; fall back to native (from Vitis settings64.sh)
+    # Vivado HLS via CVMFS-pinned apptainer image
     - mkdir -p "cmd_vivado_${VIVADO_VERSION}"
     - echo '#!/bin/bash' > "cmd_vivado_${VIVADO_VERSION}/vivado_hls"
     - echo "apptainer exec --cleanenv --env LANG=C,LC_ALL=C /cvmfs/projects.cern.ch/hls4ml/vivado/${VIVADO_VERSION} vivado_hls \"\$@\"" >> "cmd_vivado_${VIVADO_VERSION}/vivado_hls"
     - chmod +x "cmd_vivado_${VIVADO_VERSION}/vivado_hls"
-    - if [ -d "/cvmfs/projects.cern.ch/hls4ml/vivado/${VIVADO_VERSION}" ]; then export PATH="$PWD/cmd_vivado_${VIVADO_VERSION}:$PATH"; else echo "CVMFS Vivado ${VIVADO_VERSION} not available, using native"; fi
+    - export PATH="$PWD/cmd_vivado_${VIVADO_VERSION}:$PATH"
 
-    # Vitis: native install in image; prefer CVMFS wrapper when available
+    # Vitis via CVMFS-pinned apptainer image
     - source /opt/Xilinx/Vitis/${VITIS_VERSION}/settings64.sh
     - mkdir -p "cmd_vitis_${VITIS_VERSION}"
     - echo '#!/bin/bash' > "cmd_vitis_${VITIS_VERSION}/vitis-run"
     - echo "apptainer exec /cvmfs/projects.cern.ch/hls4ml/vitis/${VITIS_VERSION} vitis-run \"\$@\"" >> "cmd_vitis_${VITIS_VERSION}/vitis-run"
     - chmod +x "cmd_vitis_${VITIS_VERSION}/vitis-run"
-    - if [ -d "/cvmfs/projects.cern.ch/hls4ml/vitis/${VITIS_VERSION}" ]; then export PATH="$PWD/cmd_vitis_${VITIS_VERSION}:$PATH"; else echo "CVMFS Vitis ${VITIS_VERSION} not available, using native"; fi
+    - export PATH="$PWD/cmd_vitis_${VITIS_VERSION}:$PATH"
 
     - source /opt/intel/oneapi/setvars.sh --force
   script:
