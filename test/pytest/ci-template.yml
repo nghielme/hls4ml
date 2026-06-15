@@ -2,7 +2,7 @@
   stage: test
   image: gitlab-registry.cern.ch/fastmachinelearning/hls4ml-testing:0.6.3.base
   tags:
-    - k8s-default
+    - corellia
   variables:
     CONDA_ENV: "hls4ml-testing"
     EXTRA_DEPS: "[da,testing,testing-keras2,sr,optimization]"
