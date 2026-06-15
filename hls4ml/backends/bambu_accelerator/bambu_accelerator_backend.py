@@ -1,3 +1,4 @@
+import abc
 import inspect
 import os
 import subprocess
@@ -9,7 +10,7 @@ from hls4ml.model.optimizer import get_backend_passes
 from hls4ml.model.optimizer.optimizer import extract_optimizers_from_path
 
 
-class BambuAcceleratorBackend(BambuBackend):
+class BambuAcceleratorBackend(BambuBackend, abc.ABC):
     """Extends BambuBackend with a float wrapper around the ap_fixed HLS core.
 
     Generates additional files:
@@ -229,6 +230,14 @@ class BambuAcceleratorBackend(BambuBackend):
                 )
 
         return result
+
+    @abc.abstractmethod
+    def _generate_bitstream(self, model, project_dir: str, manifest: dict) -> dict:
+        """Run vendor P&R and return a metrics dict.
+
+        Must shell out — vendor toolchains cannot be imported into the hls4ml process.
+        Raises RuntimeError if the vendor tool fails or is not installed.
+        """
 
     def _build_float_testbench_exe(self, model):
         ret = subprocess.run(

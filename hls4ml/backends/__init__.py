@@ -15,7 +15,7 @@ from hls4ml.backends.vitis.vitis_backend import VitisBackend  # isort: skip
 
 from hls4ml.backends.bambu.bambu_backend import BambuBackend  # isort: skip
 
-from hls4ml.backends.bambu.bambu_accelerator_backend import BambuAcceleratorBackend  # isort: skip
+from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import BambuAcceleratorBackend  # isort: skip  # noqa: F401
 
 
 def _register_builtin_backends():
@@ -28,7 +28,6 @@ def _register_builtin_backends():
     register_backend('oneAPI', OneAPIBackend)
     register_backend('Libero', LiberoBackend)
     register_backend('Bambu', BambuBackend)
-    register_backend('BambuAccelerator', BambuAcceleratorBackend)
 
 
 _register_builtin_backends()

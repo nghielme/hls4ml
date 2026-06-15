@@ -1,6 +1,4 @@
-import sys
 import pathlib
-sys.path.insert(0, str(pathlib.Path(__file__).parents[4]))
 
 from hls4ml.backends.bambu_accelerator.wrapper import (
     parse_module, detect_flow, build_rename_map,
