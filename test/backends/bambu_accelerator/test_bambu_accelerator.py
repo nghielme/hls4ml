@@ -41,3 +41,15 @@ def test_concrete_subclass_with_implementation_instantiates():
 
     b = ConcreteBackend()
     assert callable(b._generate_bitstream)
+
+
+def test_rtl_templates_exist():
+    import hls4ml
+    rtl_dir = (pathlib.Path(hls4ml.__file__).parent
+               / 'templates' / 'bambu_accelerator' / 'rtl')
+    for fname in [
+        'AXISlaveParallel.v', 'AXISlaveStream.v',
+        'top_parallel.v', 'top_stream.v',
+        'sfifo.v', 'axi_addr.v', 'skidbuffer.v',
+    ]:
+        assert (rtl_dir / fname).exists(), f"Missing: {fname}"
