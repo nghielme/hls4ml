@@ -1,6 +1,10 @@
 import abc
 import inspect
+import json
 import os
+import pathlib
+import re
+import shutil
 import subprocess
 from warnings import warn
 
@@ -8,6 +12,100 @@ from hls4ml.backends.bambu.bambu_backend import BambuBackend
 from hls4ml.model.flow import register_flow
 from hls4ml.model.optimizer import get_backend_passes
 from hls4ml.model.optimizer.optimizer import extract_optimizers_from_path
+
+_RTL_TEMPLATES_DIR = (
+    pathlib.Path(__file__).parent.parent.parent
+    / 'templates' / 'bambu_accelerator' / 'rtl'
+)
+
+_RTL_FILES: dict[str, list[str]] = {
+    'parallel': ['top_parallel.v', 'AXISlaveParallel.v', 'axi_addr.v', 'skidbuffer.v'],
+    'stream':   ['top_stream.v', 'AXISlaveStream.v', 'sfifo.v', 'axi_addr.v', 'skidbuffer.v'],
+}
+
+
+def _read_n_words(project_dir: str) -> tuple[int, int]:
+    fw_dir = pathlib.Path(project_dir) / 'firmware'
+    pat = re.compile(r'\bN_(IN|OUT)\s*=\s*(\d+)')
+    n_in = n_out = None
+    for hfile in sorted(fw_dir.glob('*.h')):
+        for m in pat.finditer(hfile.read_text()):
+            if m.group(1) == 'IN':
+                n_in = int(m.group(2))
+            else:
+                n_out = int(m.group(2))
+        if n_in is not None and n_out is not None:
+            break
+    if n_in is None or n_out is None:
+        raise ValueError(f"Could not find N_IN/N_OUT in {fw_dir}/*.h")
+    return n_in, n_out
+
+
+def _build_manifest(project_dir: str, project_name: str,
+                    clock_period_ns: float, flow: str,
+                    device: str | None = None) -> dict:
+    """Parse HLS output, write manifest.json, return manifest dict."""
+    from hls4ml.backends.bambu_accelerator.wrapper import (
+        parse_module, build_rename_map, extract_data_widths,
+    )
+    project_path = pathlib.Path(project_dir)
+    vfiles = list(project_path.glob(f'{project_name}_float.v'))
+    if not vfiles:
+        raise FileNotFoundError(f"No {project_name}_float.v in {project_dir}")
+    module_name, port_names, port_decls = parse_module(vfiles[0].read_text())
+    rename_map = build_rename_map(port_names, port_decls, flow)
+    in_dw, out_dw = extract_data_widths(port_names, port_decls, flow)
+    n_in, n_out = _read_n_words(project_dir)
+    mem_files = [p.name for p in sorted(project_path.glob('*.mem'))]
+
+    manifest = {
+        'manifest_version': 1,
+        'project_name': project_name,
+        'top_module': 'myproject',
+        'hls_top': f'{project_name}_float',
+        'flow': flow,
+        'clock_period_ns': float(clock_period_ns),
+        'clock_mhz': round(1000.0 / float(clock_period_ns), 6),
+        'device': device,
+        'ports': {v: k for k, v in rename_map.items()},
+        'data_widths': {'in': in_dw, 'out': out_dw},
+        'n_words': {'in': n_in, 'out': n_out},
+        'mem_files': mem_files,
+        'rtl_files': _RTL_FILES[flow],
+    }
+    with open(project_path / 'manifest.json', 'w') as f:
+        json.dump(manifest, f, indent=2)
+    return manifest
+
+
+def _write_verilog_wrapper(project_dir: str, project_name: str) -> None:
+    """Append 'myproject' wrapper to *_float.v if not already present."""
+    from hls4ml.backends.bambu_accelerator.wrapper import (
+        parse_module, detect_flow, generate_wrapper_verilog,
+    )
+    project_path = pathlib.Path(project_dir)
+    vfiles = list(project_path.glob(f'{project_name}_float.v'))
+    if not vfiles:
+        raise FileNotFoundError(f"No {project_name}_float.v in {project_dir}")
+    vfile = vfiles[0]
+    content = vfile.read_text()
+    if re.search(r'\bmodule\s+myproject\s*[(\s]', content):
+        return
+    module_name, port_names, port_decls = parse_module(content)
+    flow = detect_flow(port_names)
+    wrapper = generate_wrapper_verilog(module_name, port_names, port_decls, flow)
+    with open(vfile, 'a') as f:
+        f.write('\n' + wrapper)
+
+
+def _copy_rtl_templates(project_dir: str, flow: str) -> None:
+    """Copy RTL glue files for the given flow into project_dir."""
+    dst = pathlib.Path(project_dir)
+    for fname in _RTL_FILES[flow]:
+        src = _RTL_TEMPLATES_DIR / fname
+        if not src.exists():
+            raise FileNotFoundError(f"RTL template missing: {src}")
+        shutil.copy2(src, dst / fname)
 
 
 class BambuAcceleratorBackend(BambuBackend, abc.ABC):
@@ -179,6 +277,7 @@ class BambuAcceleratorBackend(BambuBackend, abc.ABC):
         args=None,
         env=None,
         run_kwargs=None,
+        bitstream=False,
     ):
         """Run build, using the float testbench for C-simulation.
 
@@ -228,6 +327,22 @@ class BambuAcceleratorBackend(BambuBackend, abc.ABC):
                 raise RuntimeError(
                     f'Float testbench execution failed:\nSTDOUT:\n{ret.stdout}\nSTDERR:\n{ret.stderr}'
                 )
+
+        if synth:
+            project_name = model.config.get_project_name()
+            project_dir = model.config.get_output_dir()
+            clock_period_ns = float(model.config.get_config_value('ClockPeriod') or 50.0)
+            io_type = model.config.get_config_value('IOType') or 'io_parallel'
+            flow = 'stream' if io_type == 'io_stream' else 'parallel'
+            device = getattr(self, '_default_device', None)
+
+            _write_verilog_wrapper(project_dir, project_name)
+            _copy_rtl_templates(project_dir, flow)
+            manifest = _build_manifest(project_dir, project_name, clock_period_ns, flow, device)
+
+            if bitstream:
+                metrics = self._generate_bitstream(model, project_dir, manifest)
+                result['metrics_nx'] = metrics
 
         return result
 
