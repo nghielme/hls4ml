@@ -48,6 +48,12 @@ BAMBU_ONLY_TESTS = {
     'test_report.py::test_bambu_report',
 }
 
+# Test files to split by individual test functions.
+# Value = chunk size per CI job.
+SPLIT_BY_TEST_CASE = {
+    'test_keras_api': 1,
+}
+
 
 def batched(iterable, batch_size):
     iterator = iter(iterable)
@@ -64,6 +70,19 @@ def uses_example_model(test_filename):
         return 'example-models' in f.read()
 
 
+def collect_test_functions_from_ast(test_file, test_root):
+    import ast
+
+    with open(test_file, encoding='utf-8') as f:
+        tree = ast.parse(f.read(), filename=str(test_file))
+
+    test_funcs = []
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name.startswith('test'):
+            test_funcs.append(f'{test_file.relative_to(test_root)}::{node.name}')
+    return test_funcs
+
+
 def pytest_template(path, bambu=False):
     keras3 = path.stem in KERAS3_LIST
     if bambu and keras3:
@@ -78,6 +97,12 @@ def pytest_template(path, bambu=False):
 def job_name(test_paths, bambu=False):
     prefix = 'bambu-' if bambu else ''
     return prefix + '+'.join(path_to_name(path) for path in test_paths)
+
+
+def test_case_job_name(path, nodeids, bambu=False):
+    prefix = 'bambu-' if bambu else ''
+    suffix = '+'.join(nodeid.split('::', 1)[1].replace('test_', '') for nodeid in nodeids)
+    return f'{prefix}{path_to_name(path)}-{suffix}'
 
 
 def make_job(name, extends, pytest_file, needs_example_model):
@@ -130,6 +155,27 @@ def emit_bambu_only_tests(path, yml):
         yml.update(make_job(name, pytest_template(path, bambu=True), nodeid, uses_example_model(path)))
 
 
+def emit_split_test_jobs(path, test_root, yml):
+    functions = collect_test_functions_from_ast(path, test_root)
+    chunk_size = SPLIT_BY_TEST_CASE[path.stem]
+    needs_example_model = uses_example_model(path)
+
+    for batch in batched(functions, chunk_size):
+        standard_pytest_file = ' '.join([*batch, *extra_standard_args(path)]).strip()
+        yml.update(make_job(test_case_job_name(path, batch), pytest_template(path), standard_pytest_file, needs_example_model))
+
+        if path.stem in BAMBU_SHARED_TESTS:
+            bambu_pytest_file = ' '.join([*batch, *BAMBU_FILTER_ARGS]).strip()
+            yml.update(
+                make_job(
+                    test_case_job_name(path, batch, bambu=True),
+                    pytest_template(path, bambu=True),
+                    bambu_pytest_file,
+                    needs_example_model,
+                )
+            )
+
+
 def generate_test_yaml(test_root='.'):
     test_root = Path(test_root)
     yml = {}
@@ -138,6 +184,10 @@ def generate_test_yaml(test_root='.'):
     test_paths = [path for path in test_root.glob('**/test_*.py') if path.stem not in BLACKLIST]
 
     for path in sorted(test_paths):
+        if path.stem in SPLIT_BY_TEST_CASE:
+            emit_split_test_jobs(path, test_root, yml)
+            continue
+
         emit_or_group(path, test_root, grouped, yml, extra_args=extra_standard_args(path))
         if path.stem in BAMBU_SHARED_TESTS:
             emit_or_group(path, test_root, grouped, yml, bambu=True, extra_args=BAMBU_FILTER_ARGS)
