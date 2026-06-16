@@ -1,5 +1,5 @@
 variables:
-  BAMBU_TEST_IMAGE: ghcr.io/fastmachinelearning/hls4ml-testing:0.1.0.bambu
+  BAMBU_TEST_IMAGE: gitlab-registry.cern.ch/fastmachinelearning/hls4ml-testing:0.1.0.bambu
   BAMBU_URL: https://release.bambuhls.eu/appimage/bambu.ginevra2.AppImage
 
 .pytest-bambu:
