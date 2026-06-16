@@ -118,9 +118,8 @@ class BambuAcceleratorBackend(BambuBackend, abc.ABC):
       - build_lib.sh (overwritten)      : includes float wrapper in shared lib
     """
 
-    def __init__(self):
-        # Skip BambuBackend.__init__ to set our own name, then call FPGABackend.__init__
-        super(BambuBackend, self).__init__(name='BambuAccelerator')
+    def __init__(self, name='BambuAccelerator'):
+        super(BambuBackend, self).__init__(name=name)
         self._register_layer_attributes()
         self._register_flows()
 
