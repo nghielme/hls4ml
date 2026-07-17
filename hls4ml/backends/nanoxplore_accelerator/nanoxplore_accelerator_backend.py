@@ -24,11 +24,11 @@ class NanoXploreAcceleratorBackend(BambuAcceleratorBackend):
         """Shell out to hls4ml-nanoxplore-bitstream and return parsed metrics."""
         cmd = self._resolve_bitstream_command(model)
         try:
+            # stdout/stderr inherited: P&R runs for a long time and the CLI
+            # streams live progress; capturing here would silence the chain.
             ret = subprocess.run(
                 [cmd, project_dir],
                 check=False,
-                capture_output=True,
-                text=True,
             )
         except FileNotFoundError:
             raise RuntimeError(
@@ -38,8 +38,8 @@ class NanoXploreAcceleratorBackend(BambuAcceleratorBackend):
             )
         if ret.returncode != 0:
             raise RuntimeError(
-                f'hls4ml-nanoxplore-bitstream failed (rc={ret.returncode}):\n'
-                f'{ret.stdout}\n{ret.stderr}'
+                f'hls4ml-nanoxplore-bitstream failed (rc={ret.returncode}); '
+                f'see its output above and the logs in {project_dir}'
             )
         report_path = pathlib.Path(project_dir) / 'report.json'
         if report_path.exists():
