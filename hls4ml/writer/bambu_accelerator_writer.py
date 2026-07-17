@@ -382,6 +382,14 @@ class BambuAcceleratorWriter(BambuWriter):
                         newline += f'{indent}    out_container_t raw_i = output_stream.read();\n'
                         newline += f'{indent}    long long raw = ((long long)raw_i.to_uint64() << (64 - {total})) >> (64 - {total});\n'
                         newline += f'{indent}    std::cout << (double)raw / {scale}.0 << " ";\n'
+                        # Write the value straight back so the immediately
+                        # following '// hls-fpga-machine-learning insert
+                        # float-tb-output' block (which reads output_stream
+                        # again for the results file) doesn't drain an
+                        # already-empty FIFO. Mirrors the `keep` idiom
+                        # nnet::print_result already uses for the same
+                        # read-stream-twice situation (nnet_helpers.h).
+                        newline += f'{indent}    output_stream.write(raw_i);\n'
                         newline += f'{indent}}}\n'
                     else:
                         newline += f'{indent}for(int i = 0; i < {out.size()}; i++) {{\n'
