@@ -58,6 +58,13 @@ def _build_manifest(project_dir: str, project_name: str,
     n_in, n_out = _read_n_words(project_dir)
     mem_files = [p.name for p in sorted(project_path.glob('*.mem'))]
 
+    # Complete P&R file list: the private side adds exactly these, no
+    # flow-specific knowledge needed there. panda_libtech.v is Bambu output
+    # (tech library), present in project_dir for the stream flow.
+    rtl_files = _RTL_FILES[flow] + [f'{project_name}_float.v']
+    if flow == 'stream':
+        rtl_files.append('panda_libtech.v')
+
     manifest = {
         'manifest_version': 1,
         'project_name': project_name,
@@ -71,17 +78,21 @@ def _build_manifest(project_dir: str, project_name: str,
         'data_widths': {'in': in_dw, 'out': out_dw},
         'n_words': {'in': n_in, 'out': n_out},
         'mem_files': mem_files,
-        'rtl_files': _RTL_FILES[flow],
+        'rtl_files': rtl_files,
     }
     with open(project_path / 'manifest.json', 'w') as f:
         json.dump(manifest, f, indent=2)
     return manifest
 
 
-def _write_verilog_wrapper(project_dir: str, project_name: str) -> None:
-    """Append 'myproject' wrapper to *_float.v if not already present."""
+def _write_verilog_wrapper(project_dir: str, project_name: str, flow: str) -> None:
+    """Append 'myproject' wrapper to *_float.v if not already present.
+
+    flow comes from IOType via build() — the single driver of the
+    parallel/stream decision (wrapper, RTL copy, and manifest all agree).
+    """
     from hls4ml.backends.bambu_accelerator.wrapper import (
-        parse_module, detect_flow, generate_wrapper_verilog,
+        parse_module, generate_wrapper_verilog,
     )
     project_path = pathlib.Path(project_dir)
     vfiles = list(project_path.glob(f'{project_name}_float.v'))
@@ -92,7 +103,6 @@ def _write_verilog_wrapper(project_dir: str, project_name: str) -> None:
     if re.search(r'\bmodule\s+myproject\s*[(\s]', content):
         return
     module_name, port_names, port_decls = parse_module(content)
-    flow = detect_flow(port_names)
     wrapper = generate_wrapper_verilog(module_name, port_names, port_decls, flow)
     with open(vfile, 'a') as f:
         f.write('\n' + wrapper)
@@ -335,7 +345,7 @@ class BambuAcceleratorBackend(BambuBackend, abc.ABC):
             flow = 'stream' if io_type == 'io_stream' else 'parallel'
             device = getattr(self, '_default_device', None)
 
-            _write_verilog_wrapper(project_dir, project_name)
+            _write_verilog_wrapper(project_dir, project_name, flow)
             _copy_rtl_templates(project_dir, flow)
             manifest = _build_manifest(project_dir, project_name, clock_period_ns, flow, device)
 

@@ -16,6 +16,21 @@ def test_nanoxplore_backend_default_device():
     assert b._default_device == 'nx2h540tsc'
 
 
+def test_nanoxplore_create_initial_config_defaults():
+    """NG-ULTRA defaults, not the inherited Bambu ones (Xilinx part, 5 ns)."""
+    b = get_backend('NanoXploreAccelerator')
+    cfg = b.create_initial_config()
+    assert cfg['Part'] == 'nx2h540tsc'
+    assert cfg['ClockPeriod'] == 20
+    assert cfg['FPGAFamily'] == 'NanoXplore'
+
+
+def test_nanoxplore_create_initial_config_overridable():
+    b = get_backend('NanoXploreAccelerator')
+    cfg = b.create_initial_config(clock_period=40)
+    assert cfg['ClockPeriod'] == 40
+
+
 
 def test_generate_bitstream_missing_command_raises():
     b = get_backend('NanoXploreAccelerator')

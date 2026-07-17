@@ -13,6 +13,13 @@ class NanoXploreAcceleratorBackend(BambuAcceleratorBackend):
     def __init__(self):
         super().__init__()
 
+    def create_initial_config(self, part='nx2h540tsc', clock_period=20, **kwargs):
+        """NG-ULTRA defaults: nx2h540tsc (mapped in partname_to_bambu) and 20 ns,
+        matching the DevKit's 50 MHz oscillator so the P&R constraint equals the
+        physical clock without a PLL. The inherited Bambu defaults (Xilinx part,
+        5 ns) would silently mis-target both HLS scheduling and the manifest."""
+        return super().create_initial_config(part=part, clock_period=clock_period, **kwargs)
+
     def _generate_bitstream(self, model, project_dir: str, manifest: dict) -> dict:
         """Shell out to hls4ml-nanoxplore-bitstream and return parsed metrics."""
         cmd = self._resolve_bitstream_command(model)

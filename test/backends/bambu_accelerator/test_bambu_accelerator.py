@@ -102,6 +102,9 @@ def test_build_manifest_rtl_files_parallel():
     assert 'top_parallel.v' in m['rtl_files']
     assert 'AXISlaveParallel.v' in m['rtl_files']
     assert 'top_stream.v' not in m['rtl_files']
+    # complete list: HLS output included, so the private side adds exactly these
+    assert 'myproject_float.v' in m['rtl_files']
+    assert 'panda_libtech.v' not in m['rtl_files']  # stream-only, Bambu output
 
 
 def test_build_manifest_mem_files_empty_for_parallel():
@@ -161,7 +164,7 @@ def test_write_verilog_wrapper_appends_module():
     with tempfile.TemporaryDirectory() as tmp:
         d = pathlib.Path(tmp)
         (d / 'myproject_float.v').write_text(BRAM_V)
-        _write_verilog_wrapper(str(d), 'myproject')
+        _write_verilog_wrapper(str(d), 'myproject', 'parallel')
         content = (d / 'myproject_float.v').read_text()
     assert 'module myproject' in content
     assert 'myproject_float u0' in content
@@ -172,8 +175,8 @@ def test_write_verilog_wrapper_idempotent():
     with tempfile.TemporaryDirectory() as tmp:
         d = pathlib.Path(tmp)
         (d / 'myproject_float.v').write_text(BRAM_V)
-        _write_verilog_wrapper(str(d), 'myproject')
-        _write_verilog_wrapper(str(d), 'myproject')
+        _write_verilog_wrapper(str(d), 'myproject', 'parallel')
+        _write_verilog_wrapper(str(d), 'myproject', 'parallel')
         content = (d / 'myproject_float.v').read_text()
     assert content.count('module myproject (') == 1
 
