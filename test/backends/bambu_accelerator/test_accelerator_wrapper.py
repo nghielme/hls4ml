@@ -125,3 +125,51 @@ def test_generate_top_localparams_parallel_has_addr_w():
 def test_generate_top_localparams_stream_no_addr_w():
     lp = generate_top_localparams(16, 8, 64, 1, 'stream')
     assert 'HLS_IN_ADDR_W' not in lp
+
+
+MULTI_MODULE_AXIS_VERILOG = """
+module DF_bambu_1_2FO0_bambu_artificial_ParmMgr_Write_fifo_modgen(clock);
+  input clock;
+endmodule
+
+module input_stream_bambu_artificial_ParmMgr_Read_axis_modgen(clock);
+  input clock;
+endmodule
+
+module datapath_ZL16ingest_fc1_input(clock);
+  input clock;
+endmodule
+
+module p_Z15myproject_float (
+  clock, reset, start_port,
+  input_stream_TDATA, input_stream_TVALID, output_stream_TREADY,
+  done_port, idle_port,
+  input_stream_TREADY, output_stream_TDATA, output_stream_TVALID
+);
+  input  clock;
+  input  reset;
+  input  start_port;
+  input  [15:0] input_stream_TDATA;
+  input  input_stream_TVALID;
+  input  output_stream_TREADY;
+  output done_port;
+  output idle_port;
+  output input_stream_TREADY;
+  output [63:0] output_stream_TDATA;
+  output output_stream_TVALID;
+endmodule
+"""
+
+
+def test_parse_module_picks_last_module_among_many():
+    """Real Bambu output has ~10-30 helper modules (datapath_*, controller_*,
+    PBI_*, *_fifo_modgen, *_axis_modgen) before the true top-level p_-prefixed
+    wrapper. parse_module must skip all of them and pick the last one."""
+    name, ports, _ = parse_module(MULTI_MODULE_AXIS_VERILOG)
+    assert name == 'p_Z15myproject_float'
+    assert 'input_stream_TDATA' in ports
+
+
+def test_parse_module_multi_module_detects_stream_flow():
+    _, ports, _ = parse_module(MULTI_MODULE_AXIS_VERILOG)
+    assert detect_flow(ports) == 'stream'
