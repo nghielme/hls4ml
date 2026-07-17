@@ -11,6 +11,14 @@ def test_nanoxplore_backend_registered():
     assert b is not None
 
 
+def test_nanoxplore_backend_name_roundtrips():
+    """hls4ml stores backend.name in the model config and calls get_backend()
+    on it again (HLSConfig.__init__); the name must be the registered alias."""
+    b = get_backend('NanoXploreAccelerator')
+    assert b.name == 'NanoXploreAccelerator'
+    assert get_backend(b.name) is b
+
+
 def test_nanoxplore_backend_default_device():
     b = get_backend('NanoXploreAccelerator')
     assert b._default_device == 'nx2h540tsc'

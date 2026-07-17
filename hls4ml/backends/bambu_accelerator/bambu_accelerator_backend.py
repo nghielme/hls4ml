@@ -59,11 +59,10 @@ def _build_manifest(project_dir: str, project_name: str,
     mem_files = [p.name for p in sorted(project_path.glob('*.mem'))]
 
     # Complete P&R file list: the private side adds exactly these, no
-    # flow-specific knowledge needed there. panda_libtech.v is Bambu output
-    # (tech library), present in project_dir for the stream flow.
-    rtl_files = _RTL_FILES[flow] + [f'{project_name}_float.v']
-    if flow == 'stream':
-        rtl_files.append('panda_libtech.v')
+    # flow-specific knowledge needed there. panda_libtech.v is Bambu's cell
+    # library (MUX2_GATE, *_FU primitives) — required by every Bambu netlist,
+    # otherwise NxMap elaboration fails with blackbox errors.
+    rtl_files = _RTL_FILES[flow] + [f'{project_name}_float.v', 'panda_libtech.v']
 
     manifest = {
         'manifest_version': 1,

@@ -102,9 +102,10 @@ def test_build_manifest_rtl_files_parallel():
     assert 'top_parallel.v' in m['rtl_files']
     assert 'AXISlaveParallel.v' in m['rtl_files']
     assert 'top_stream.v' not in m['rtl_files']
-    # complete list: HLS output included, so the private side adds exactly these
+    # complete list: HLS output + Bambu cell library included, so the private
+    # side adds exactly these
     assert 'myproject_float.v' in m['rtl_files']
-    assert 'panda_libtech.v' not in m['rtl_files']  # stream-only, Bambu output
+    assert 'panda_libtech.v' in m['rtl_files']
 
 
 def test_build_manifest_mem_files_empty_for_parallel():

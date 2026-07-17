@@ -155,6 +155,12 @@ class BambuWriter(Writer):
             # not supported).
             return f'//#pragma HLS STREAM variable={variable.name} depth={depth}'
 
+    # weights/biases are `static const` (ROMs) since the const-propagation
+    # change; Bambu's `__bambu_csroa_partition__(void*, ...)` intrinsic has no
+    # const overload, so an active ARRAY_PARTITION on them is a hard compile
+    # error. Keep those commented regardless of USE_BAMBU_ARRAY_PARTITION.
+    _CONST_ARRAY_VARIABLES_RE = re.compile(r'variable\s*=\s*(weights|biases)\b', re.IGNORECASE)
+
     @classmethod
     def _rewrite_array_partition_pragmas(cls, header_path):
         enable_array_partition = cls._should_emit_array_partition_pragma()
@@ -165,7 +171,7 @@ class BambuWriter(Writer):
                 match = cls._ARRAY_PARTITION_PRAGMA_RE.match(line)
                 if match:
                     indent, pragma = match.groups()
-                    if enable_array_partition:
+                    if enable_array_partition and not cls._CONST_ARRAY_VARIABLES_RE.search(pragma):
                         rewritten.append(f'{indent}{pragma}\n')
                     else:
                         rewritten.append(f'{indent}//{pragma}\n')

@@ -12,6 +12,33 @@ class NanoXploreAcceleratorBackend(BambuAcceleratorBackend):
 
     def __init__(self):
         super().__init__()
+        # Flows, passes and the writer are registered under 'BambuAccelerator'
+        # by super().__init__() (their ids are stored on self, so lookups keep
+        # working). The instance name must be the *registered* alias though:
+        # hls4ml writes backend.name into the model config and round-trips it
+        # through get_backend(), and 'BambuAccelerator' is abstract/unregistered.
+        self.name = 'NanoXploreAccelerator'
+
+    # Pass lookups that run lazily (after the rename above) must keep using
+    # the name the passes were registered under. Without this, apply_templates
+    # resolves zero templates, no layer gets a function_cpp, and the generated
+    # <proj>_float.cpp body contains no layer calls — Bambu then dead-codes the
+    # entire datapath (no output write ports on the HLS top).
+    _passes_name = 'BambuAccelerator'
+
+    def _get_layer_templates(self):
+        from hls4ml.backends.template import Template
+        from hls4ml.model.optimizer import get_backend_passes, get_optimizer
+
+        return [name for name in get_backend_passes(self._passes_name) if isinstance(get_optimizer(name), Template)]
+
+    def _get_layer_initializers(self):
+        real_name = self.name
+        self.name = self._passes_name
+        try:
+            return super()._get_layer_initializers()
+        finally:
+            self.name = real_name
 
     def create_initial_config(self, part='nx2h540tsc', clock_period=20, **kwargs):
         """NG-ULTRA defaults: nx2h540tsc (mapped in partname_to_bambu) and 20 ns,
