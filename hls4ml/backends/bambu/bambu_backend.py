@@ -418,6 +418,13 @@ class BambuBackend(FPGABackend):
         project_name = model.config.get_project_name()
         project_dir = model.config.get_output_dir()
         part_family = model.config.get_config_value("FPGAFamily")
+        # Bambu's InterfaceInfer pass (ChasePointerInterfaceRecurse) has a
+        # 64-bit-pointer bug that fires only on the ac_channel FIFO ports
+        # io_stream generates ("unexpected condition",
+        # InterfaceInfer.cpp:1068); io_parallel's BRAM address/data ports
+        # never hit it. Confirmed by bisecting Bambu's HLS flags: identical
+        # stream C++ synthesizes to AXIS Verilog once -m64 is omitted.
+        io_type = model.config.get_config_value('IOType')
 
         # Bambu-specific command/flags
         BASE_COMMAND = ['bambu'] + self._get_hls_sources(project_name) + [f'--top-fname={self._get_top_fname(project_name)}']
@@ -453,6 +460,8 @@ class BambuBackend(FPGABackend):
                         '-v4',
                         '-m64'
                        ]
+        if io_type == 'io_stream':
+            REQ_ARGS = [arg for arg in REQ_ARGS if arg != '-m64']
         CMD_ARGS      = []
         
         result = {}
