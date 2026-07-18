@@ -153,5 +153,19 @@ class TestGetAllVcos(unittest.TestCase):
         self.assertIn("PLL_1", result)
         self.assertIn("PLL_2", result)
 
+    def test_solve_pll_375_to_50_register_semantics(self):
+        """Reconstruct the output frequency from the emitted registers under the
+        hardware-validated encoding (golden top_parallel.v): ref_intdiv = ratio,
+        fbk ratio = 2*(fbk_intdiv+1), static S1 divider ratio = 2*code+3."""
+        import re
+        block = solve_pll(375.0, [50.0])
+        ref = int(re.search(r"ref_intdiv\s*\(5'd(\d+)\)", block).group(1))
+        fbk = int(re.search(r"fbk_intdiv\s*\(7'd(\d+)\)", block).group(1))
+        out1 = int(re.search(r"clk_outdiv1\s*\(3'd(\d+)\)", block).group(1))
+        pfd = 375.0 / ref
+        vco = pfd * 2 * (fbk + 1)
+        out = vco / (2 * out1 + 3)   # S1 static map: ratio = 2*code + 3
+        self.assertAlmostEqual(out, 50.0, places=3)
+
 if __name__ == '__main__':
     unittest.main()

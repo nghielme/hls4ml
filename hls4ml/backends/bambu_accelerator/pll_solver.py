@@ -296,7 +296,9 @@ def generate_vhdl_ortools(solver, x, assign, use_stat, use_dyn, targets, vco_lis
         fbk_delay_on => '0', 
         fbk_delay => to_bitvector(conv_std_logic_vector(0,6)),
         
-        ref_intdiv   => to_bitvector(conv_std_logic_vector({cfg['ref']},5)),
+        -- ref_intdiv register = divide ratio (hardware-validated golden: 375/15 = 25 MHz PFD);
+        -- cfg['ref'] stores ratio-1 internally, so emit +1.
+        ref_intdiv   => to_bitvector(conv_std_logic_vector({cfg['ref'] + 1},5)),
         fbk_intdiv   => to_bitvector(conv_std_logic_vector({cfg['fbk']},7)),
         
         clk_outdiv1  => to_bitvector(conv_std_logic_vector({g['clk_outdiv1'][0]},{g['clk_outdiv1'][1]})),
@@ -418,7 +420,9 @@ NX_PLL_U #(
     .ext_fbk_on      (1'b0),
     .fbk_delay_on    (1'b0),
     .fbk_delay       (6'd0),
-    .ref_intdiv      (5'd{cfg['ref']}),
+    // ref_intdiv register = divide ratio (hardware-validated golden: 375/15 = 25 MHz PFD);
+    // cfg['ref'] stores ratio-1 internally, so emit +1.
+    .ref_intdiv      (5'd{cfg['ref'] + 1}),
     .fbk_intdiv      (7'd{cfg['fbk']}),
     .clk_outdiv1     (3'd{g['clk_outdiv1'][0]}),
     .clk_outdiv2     (3'd{g['clk_outdiv2'][0]}),

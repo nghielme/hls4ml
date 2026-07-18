@@ -138,7 +138,7 @@ def _render_pll_block(clock_period_ns: float) -> str:
             f'{clock_period_ns} ns constraint is exactly the mismatch this guards against.)'
         ) from exc
     block = re.sub(r'\bclk_[0-9][0-9_]*mhz\b', 'clk_50_0mhz', block)
-    block = block.replace('.R         (rst)', '.R         (~rstn_i)')
+    block = re.sub(r'\.R\s+\(rst\)', '.R         (~rstn_i)', block)
     return block
 
 
