@@ -444,21 +444,28 @@ class BambuBackend(FPGABackend):
         # See firmware/nnet_utils/nnet_activation.h:228 in hls4ml's bambu
         # templates for the actual `make_index_sequence` call site.
         CC_TEMPLATE_DEPTH = '-ftemplate-depth=2048'
-        if os.environ.get('USE_BAMBU_AC_TYPES'):
+        if os.environ.get('USE_HLS4ML_AC_TYPES'):
+            # Legacy escape hatch: compile against the ac_types checkout the
+            # writer copies into firmware/ac_types, with a 64-bit host triple.
+            # The -m64 this needs trips Bambu's InterfaceInfer 64-bit pointer
+            # bug on io_stream's ac_channel FIFOs, so it is filtered below.
             REQ_ARGS = ['-lm',
-                        '--compiler=I386_CLANG16',
-                        CC_TEMPLATE_DEPTH,
-                        '--generate-interface=INFER',
-                        '-v4'
-                       ]
-        else:
-            REQ_ARGS = ['-lm', 
                         '-Ifirmware/ac_types',
                         '--compiler=I386_CLANG16',
                         CC_TEMPLATE_DEPTH,
                         '--generate-interface=INFER',
                         '-v4',
                         '-m64'
+                       ]
+        else:
+            # Default: Bambu's own shipped ac/ap headers (usr/include/panda),
+            # always in sync with the toolchain, 32-bit triple — no -m64
+            # needed, which also sidesteps the InterfaceInfer io_stream bug.
+            REQ_ARGS = ['-lm',
+                        '--compiler=I386_CLANG16',
+                        CC_TEMPLATE_DEPTH,
+                        '--generate-interface=INFER',
+                        '-v4'
                        ]
         if io_type == 'io_stream':
             REQ_ARGS = [arg for arg in REQ_ARGS if arg != '-m64']
