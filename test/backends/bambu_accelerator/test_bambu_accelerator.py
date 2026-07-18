@@ -226,3 +226,55 @@ def test_pll_markers_in_top_templates():
         region = content.split('// HLS4ML PLL BEGIN')[1].split('// HLS4ML PLL END')[0]
         assert 'NX_PLL_U' in region, fname
         assert 'clk_50_0mhz' in region, fname
+
+
+def test_render_pll_block_25mhz():
+    pytest.importorskip('ortools')
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import _render_pll_block
+    block = _render_pll_block(40.0)  # 1000/40 = 25 MHz
+    assert 'NX_PLL_U' in block
+    assert 'clk_50_0mhz' in block          # fixed interface wire
+    assert '(~rstn_i)' in block            # template reset polarity
+    assert 'clk_25mhz' not in block        # generator's own name post-processed away
+    assert 'locked_1' in block
+
+
+def test_patch_pll_splices_region(tmp_path):
+    pytest.importorskip('ortools')
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import (
+        _RTL_TEMPLATES_DIR, _patch_pll,
+    )
+    import shutil as _sh
+    _sh.copy2(_RTL_TEMPLATES_DIR / 'top_parallel.v', tmp_path / 'top_parallel.v')
+    _patch_pll(str(tmp_path), 'parallel', 40.0)
+    content = (tmp_path / 'top_parallel.v').read_text()
+    assert content.count('// HLS4ML PLL BEGIN') == 1
+    assert content.count('// HLS4ML PLL END') == 1
+    region = content.split('// HLS4ML PLL BEGIN')[1].split('// HLS4ML PLL END')[0]
+    assert '25' in region                  # 25 MHz config in comments/values
+    assert 'clk_50_0mhz' in region
+    assert 'generates 50.0 MHz' not in region  # default block replaced
+
+
+def test_patch_pll_noop_at_50mhz(tmp_path):
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import (
+        _RTL_TEMPLATES_DIR, _patch_pll,
+    )
+    import shutil as _sh
+    _sh.copy2(_RTL_TEMPLATES_DIR / 'top_parallel.v', tmp_path / 'top_parallel.v')
+    before = (tmp_path / 'top_parallel.v').read_text()
+    _patch_pll(str(tmp_path), 'parallel', 20.0)   # 50 MHz -> keep default, no ortools needed
+    assert (tmp_path / 'top_parallel.v').read_text() == before
+
+
+def test_patch_pll_missing_ortools_fails_loud(tmp_path, monkeypatch):
+    from hls4ml.backends.bambu_accelerator import bambu_accelerator_backend as bab
+    import shutil as _sh
+    _sh.copy2(bab._RTL_TEMPLATES_DIR / 'top_parallel.v', tmp_path / 'top_parallel.v')
+
+    def _no_ortools(*a, **k):
+        raise ImportError('No module named ortools')
+
+    monkeypatch.setattr('hls4ml.backends.bambu_accelerator.pll_solver.solve_pll', _no_ortools)
+    with pytest.raises(RuntimeError, match=r'hls4ml\[nanoxplore\]'):
+        bab._patch_pll(str(tmp_path), 'parallel', 40.0)
