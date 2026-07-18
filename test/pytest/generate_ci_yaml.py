@@ -13,7 +13,7 @@ Bambu image. Pytest collection filters select the backend cases for each image.
 
 n_test_files_per_yml = int(os.environ.get('N_TESTS_PER_YAML', 4))
 
-BAMBU_BACKENDS = ('Bambu', 'BambuAccelerator')
+BAMBU_BACKENDS = ('Bambu',)
 BAMBU_FILTER_ARGS = tuple(f'--backend-filter={backend}' for backend in BAMBU_BACKENDS)
 BAMBU_EXCLUDE_ARGS = tuple(f'--backend-exclude={backend}' for backend in BAMBU_BACKENDS)
 

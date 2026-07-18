@@ -1,6 +1,6 @@
 variables:
   BAMBU_TEST_IMAGE: gitlab-registry.cern.ch/fastmachinelearning/hls4ml-testing:0.1.0.bambu
-  BAMBU_URL: https://release.bambuhls.eu/appimage/bambu.ginevra2.AppImage
+  BAMBU_URL: https://release.bambuhls.eu/bambu.ginevra3.AppImage
 
 .pytest-bambu:
   stage: test
@@ -11,7 +11,6 @@ variables:
     CONDA_ENV: "hls4ml-testing"
     EXTRA_DEPS: "[da,testing,testing-keras2,sr,optimization]"
     BAMBU_INSTALL_DIR: ".bambu-squashfs"
-    USE_BAMBU_AC_TYPES: "1"
     USE_BAMBU_ARRAY_PARTITION: "1"
   before_script:
     - eval "$(conda shell.bash hook)"
