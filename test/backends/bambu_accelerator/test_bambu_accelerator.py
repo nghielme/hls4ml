@@ -212,3 +212,17 @@ def test_rtl_templates_exist():
         'sfifo.v', 'axi_addr.v', 'skidbuffer.v',
     ]:
         assert (rtl_dir / fname).exists(), f"Missing: {fname}"
+
+
+def test_pll_markers_in_top_templates():
+    """Both top templates carry exactly one HLS4ML PLL BEGIN/END region
+    enclosing the default 50 MHz NX_PLL_U block (Task 3 splices there)."""
+    rtl_dir = (pathlib.Path(__file__).parents[3]
+               / 'hls4ml' / 'templates' / 'bambu_accelerator' / 'rtl')
+    for fname in ('top_parallel.v', 'top_stream.v'):
+        content = (rtl_dir / fname).read_text()
+        assert content.count('// HLS4ML PLL BEGIN') == 1, fname
+        assert content.count('// HLS4ML PLL END') == 1, fname
+        region = content.split('// HLS4ML PLL BEGIN')[1].split('// HLS4ML PLL END')[0]
+        assert 'NX_PLL_U' in region, fname
+        assert 'clk_50_0mhz' in region, fname
