@@ -1,4 +1,3 @@
-import pathlib
 
 from tensorflow import keras
 

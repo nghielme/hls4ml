@@ -1184,8 +1184,8 @@ class BambuWriter(Writer):
             copyfile(srcpath + h, dstpath + h)
             self._rewrite_array_partition_pragmas(dstpath + h)
 
-        # ac_types (ap_fixed headers) — always copied; USE_BAMBU_AC_TYPES is
-        # read by Bambu's own build scripts, not by Python here.
+        # ac_types (ap_fixed headers) — always copied; only the legacy
+        # USE_HLS4ML_AC_TYPES=1 path (see BambuBackend.build) compiles against it.
         filedir = os.path.dirname(os.path.abspath(__file__))
 
         srcpath = os.path.join(filedir, '../templates/bambu/ac_types/')
