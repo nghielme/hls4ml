@@ -173,3 +173,26 @@ def test_parse_module_picks_last_module_among_many():
 def test_parse_module_multi_module_detects_stream_flow():
     _, ports, _ = parse_module(MULTI_MODULE_AXIS_VERILOG)
     assert detect_flow(ports) == 'stream'
+
+
+def test_generate_top_localparams_formats_what_it_is_given():
+    lp = generate_top_localparams(16, 16, 64, 8, 'parallel')
+    assert 'HLS_OUT_N_WORDS = 8;' in lp
+    assert 'HLS_OUT_ADDR_W' in lp
+
+
+def test_extract_bram_depths_from_address_widths():
+    """Depth is 2**address_port_width, not the element count.  Measured on
+    NG-ULTRA: a non-power-of-two HLS_OUT_N_WORDS makes NxMap delete the
+    datapath (144 LUT4 / 0 carry at 5, vs 3329 / 7794 at 8)."""
+    from hls4ml.backends.bambu_accelerator.wrapper import extract_bram_depths
+    _, ports, decls = parse_module(BRAM_VERILOG)
+    assert extract_bram_depths(ports, decls, 'parallel') == {'in': 8, 'out': 16}
+
+
+def test_extract_bram_depths_none_for_stream():
+    """Stream must NOT get depths -- AXISlaveStream's LAST_BEAT_*_VALID is a
+    count of valid words in the final beat, so padding emits phantom beats."""
+    from hls4ml.backends.bambu_accelerator.wrapper import extract_bram_depths
+    _, ports, decls = parse_module(AXIS_VERILOG)
+    assert extract_bram_depths(ports, decls, 'stream') is None

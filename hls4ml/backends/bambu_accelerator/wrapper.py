@@ -10,6 +10,7 @@ Typical usage::
     flow = detect_flow(port_names)
     wrapper_verilog = generate_wrapper_verilog(module_name, port_names, port_decls, flow)
     in_dw, out_dw = extract_data_widths(port_names, port_decls, flow)
+    slots = extract_bram_depths(port_names, port_decls, flow)   # None for 'stream'
     localparams = generate_top_localparams(in_dw, n_in, out_dw, n_out, flow)
 """
 
@@ -279,9 +280,53 @@ def extract_data_widths(port_names: list[str], port_decls: PortDecls,
     return in_dw, out_dw
 
 
+def extract_bram_depths(port_names: list[str], port_decls: PortDecls,
+                        flow: str) -> dict[str, int] | None:
+    """Return {'in': depth, 'out': depth} = 2 ** (width of each `*_address0` port).
+
+    This is Bambu's BRAM depth, which it rounds up to a whole number of address
+    bits: a 5-element output array gets a 3-bit address = 8 slots.  It is NOT
+    the element count from the firmware headers.
+
+    HLS_*_N_WORDS must carry the DEPTH, established empirically on NG-ULTRA
+    (jet-tagger, 5 outputs, 3-bit address port):
+
+        N_WORDS=4 (stale template)  ->  2958 LUT4, 7794 carry, works, but the
+                                        AXI window is short and the board's
+                                        read burst hangs (bsp_rc=4)
+        N_WORDS=5 (element count)   ->   144 LUT4,    0 carry -- NxMap deletes
+                                        the entire datapath.  The AXI slave's
+                                        output_flat_padded path nominally
+                                        supports a non-power-of-two word count;
+                                        in practice synthesis collapses it.
+        N_WORDS=8 (BRAM depth)      ->  3329 LUT4, 7794 carry, datapath intact
+
+    Returns None for the stream flow: AXI-Stream IPs have no address ports, and
+    AXISlaveStream's N_BEATS_*/LAST_BEAT_*_VALID arithmetic genuinely wants the
+    element count.  Do not route this value there.
+    """
+    if flow == 'stream':
+        return None
+
+    inverse = {new: old for old, new in build_rename_map(port_names, port_decls, flow).items()}
+    depths = {}
+    for key, base in (('in', 'input'), ('out', 'output')):
+        port = inverse.get(f'{base}_address0') or inverse.get(f'{base}_address1')
+        if port is None:
+            raise ValueError(f"No {base} address port found -- cannot size the {key} BRAM")
+        depths[key] = 2 ** _parse_width(port_decls[port][1])
+    return depths
+
+
 def generate_top_localparams(in_dw: int, in_n: int, out_dw: int, out_n: int,
                              flow: str) -> str:
     """Return the localparam block string for top_parallel.v / top_stream.v.
+
+    `in_n`/`out_n` are BRAM DEPTHS for the parallel flow (see
+    extract_bram_depths -- a non-power-of-two value makes NxMap delete the
+    datapath) and ELEMENT COUNTS for the stream flow (AXISlaveStream's
+    LAST_BEAT_*_VALID arithmetic needs the true count).  The caller routes it;
+    this function only formats.
 
     Parallel flow emits the four HLS_*_DATA_W / HLS_*_N_WORDS parameters plus
     the two derived HLS_*_ADDR_W widths that AXISlaveParallel needs.

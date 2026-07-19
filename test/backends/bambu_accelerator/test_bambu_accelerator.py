@@ -66,12 +66,18 @@ endmodule
 """
 
 
-def _make_project_dir(tmp_path, verilog, n_in=8, n_out=1):
+def _make_project_dir(tmp_path, verilog, n_in=8, n_out=1,
+                      in_fp=(16, 6), out_fp=(35, 15)):
     fw = tmp_path / 'firmware'
     fw.mkdir()
     (fw / 'myproject_float.h').write_text(
         f'static const unsigned N_IN = {n_in};\n'
         f'static const unsigned N_OUT = {n_out};\n'
+    )
+    (fw / 'defines.h').write_text(
+        f'typedef ap_fixed<{in_fp[0]},{in_fp[1]}> input_t;\n'
+        'typedef ap_fixed<37,17> fc1_result_t;\n'
+        f'typedef ap_fixed<{out_fp[0]},{out_fp[1]}> result_t;\n'
     )
     (tmp_path / 'myproject_float.v').write_text(verilog)
     return tmp_path
@@ -278,3 +284,113 @@ def test_patch_pll_missing_ortools_fails_loud(tmp_path, monkeypatch):
     monkeypatch.setattr('hls4ml.backends.bambu_accelerator.pll_solver.solve_pll', _no_ortools)
     with pytest.raises(RuntimeError, match=r'hls4ml\[nanoxplore\]'):
         bab._patch_pll(str(tmp_path), 'parallel', 40.0)
+
+
+# --- geometry: element counts, fixed point, and the top-file patch ---------
+
+def test_build_manifest_carries_both_counts_and_depths(tmp_path):
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import _build_manifest
+    d = _make_project_dir(tmp_path, BRAM_V, n_in=5, n_out=9)
+    m = _build_manifest(str(d), 'myproject', clock_period_ns=50.0, flow='parallel')
+    # Both are needed and they differ: depths drive the RTL, counts the host.
+    assert m['n_words'] == {'in': 5, 'out': 9}
+    assert m['bram_slots'] == {'in': 8, 'out': 16}
+
+
+def test_build_manifest_fixed_point(tmp_path):
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import _build_manifest
+    d = _make_project_dir(tmp_path, BRAM_V, in_fp=(16, 6), out_fp=(35, 15))
+    m = _build_manifest(str(d), 'myproject', clock_period_ns=50.0, flow='parallel')
+    assert m['fixed_point'] == {'in': {'total': 16, 'int': 6},
+                                'out': {'total': 35, 'int': 15}}
+    assert m['manifest_version'] == 1
+
+
+def test_read_fixed_point_ignores_similar_typedefs(tmp_path):
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import _read_fixed_point
+    fw = tmp_path / 'firmware'
+    fw.mkdir()
+    (fw / 'defines.h').write_text(
+        'typedef ap_fixed<18,8> fc1_relu_table_t;\n'
+        'typedef ap_fixed<37,17> fc1_result_t;\n'
+        'typedef ap_fixed<12,4> input_t;\n'
+        'typedef ap_fixed<24,10> result_t;\n'
+    )
+    assert _read_fixed_point(str(tmp_path)) == {'in': {'total': 12, 'int': 4},
+                                                'out': {'total': 24, 'int': 10}}
+
+
+def _copy_top(tmp_path, flow):
+    import shutil as _sh
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import _RTL_TEMPLATES_DIR
+    _sh.copy2(_RTL_TEMPLATES_DIR / f'top_{flow}.v', tmp_path / f'top_{flow}.v')
+
+
+def _localparams(path):
+    return {m.group(1): int(m.group(2)) for m in
+            __import__('re').finditer(r'localparam\s+(HLS_\w+)\s*=\s*(\d+);', path.read_text())}
+
+
+def test_patch_params_writes_model_geometry(tmp_path):
+    """Full path: template defaults (16/64/16/4) must be replaced by the
+    fixture's real geometry.  Deliberately asymmetric so this fails if
+    _patch_params is removed or fed element counts."""
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import (
+        _build_manifest, _patch_params,
+    )
+    d = _make_project_dir(tmp_path, BRAM_V, n_in=5, n_out=9)
+    _copy_top(tmp_path, 'parallel')
+    before = _localparams(tmp_path / 'top_parallel.v')
+    assert before['HLS_OUT_N_WORDS'] == 4          # template default
+
+    m = _build_manifest(str(d), 'myproject', clock_period_ns=50.0, flow='parallel')
+    _patch_params(str(d), 'parallel', m['data_widths'], m['n_words'], m['bram_slots'])
+
+    after = _localparams(tmp_path / 'top_parallel.v')
+    # BRAM depths 8/16 -- differ from both the template defaults (16/4) and
+    # the element counts (5/9), so this fails under either bug.
+    assert after == {'HLS_IN_DATA_W': 8, 'HLS_OUT_DATA_W': 8,
+                     'HLS_IN_N_WORDS': 8, 'HLS_OUT_N_WORDS': 16}
+    assert '_ADDR_W' in (tmp_path / 'top_parallel.v').read_text()
+
+
+def test_patch_params_stream_uses_element_counts(tmp_path):
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import _patch_params
+    _copy_top(tmp_path, 'stream')
+    _patch_params(str(tmp_path), 'stream',
+                  {'in': 16, 'out': 64}, {'in': 5, 'out': 9}, None)
+    assert _localparams(tmp_path / 'top_stream.v') == {
+        'HLS_IN_DATA_W': 16, 'HLS_OUT_DATA_W': 64,
+        'HLS_IN_N_WORDS': 5, 'HLS_OUT_N_WORDS': 9,
+    }
+
+
+def test_patch_params_missing_markers_raises(tmp_path):
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import _patch_params
+    (tmp_path / 'top_parallel.v').write_text('module top(); endmodule\n')
+    with pytest.raises(RuntimeError, match='PARAMS markers'):
+        _patch_params(str(tmp_path), 'parallel',
+                      {'in': 8, 'out': 8}, {'in': 5, 'out': 9}, {'in': 8, 'out': 16})
+
+
+def test_read_fixed_point_struct_form(tmp_path):
+    """io_stream emits input_t/result_t as structs with an inner value_type
+    typedef, not flat typedefs.  Parsing only the flat form breaks every
+    stream build at _build_manifest."""
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import _read_fixed_point
+    fw = tmp_path / 'firmware'
+    fw.mkdir()
+    (fw / 'defines.h').write_text(
+        'struct input_t {\n'
+        '    typedef ap_fixed<16,6> value_type;\n'
+        '    static const unsigned size = 2*1;\n'
+        '};\n'
+        'struct fc1_result_t {\n'
+        '    typedef ap_fixed<34,14> value_type;\n'
+        '};\n'
+        'struct result_t {\n'
+        '    typedef ap_fixed<35,15> value_type;\n'
+        '};\n'
+    )
+    assert _read_fixed_point(str(tmp_path)) == {'in': {'total': 16, 'int': 6},
+                                                'out': {'total': 35, 'int': 15}}
