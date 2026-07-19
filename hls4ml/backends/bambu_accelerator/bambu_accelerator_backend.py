@@ -218,16 +218,16 @@ def _patch_params(project_dir: str, flow: str, data_widths: dict,
     N_WORDS=5 makes NxMap delete the whole datapath (144 LUT4 / 0 carry vs
     3329 / 7794 at N_WORDS=8).  See extract_bram_depths.
 
-    The element counts go out separately as HLS_*_N_ELEMS, which is all
-    AXISlaveParallel's beat arithmetic uses.  Both must be emitted: the depth
-    alone put the cycle-counter beat at ceil(8/2)=4 while fpga_inference.c
-    reads it at the offset implied by the element count (beat 3), so
-    fpga_exec_cycles read padding; and on the input side a depth larger than
-    the count makes the FSM wait for beats the firmware never sends.
+    KNOWN GAP: at the depth the slave puts its cycle-counter beat at index
+    N_BEATS_OUT=ceil(8/2)=4, while fpga_inference.c reads it at the offset
+    implied by the element count (beat 3).  The DMA no longer hangs -- the
+    firmware requests 4 beats and the slave offers 5 -- but fpga_exec_cycles
+    reads padding.  Proper fix is a separate element-count parameter on
+    AXISlaveParallel for the beat math; tracked, not done here.
 
-    Stream keeps the element count in HLS_*_N_WORDS: AXISlaveStream's
-    LAST_BEAT_*_VALID is genuinely a count of valid words in the final beat,
-    and that path is verified working on hardware.  It gets no N_ELEMS.
+    Stream keeps the element count: AXISlaveStream's LAST_BEAT_*_VALID is
+    genuinely a count of valid words in the final beat, and that path is
+    verified working on hardware.
     """
     from hls4ml.backends.bambu_accelerator.wrapper import generate_top_localparams
 
@@ -239,8 +239,7 @@ def _patch_params(project_dir: str, flow: str, data_widths: dict,
     head, rest = content.split(_PARAMS_BEGIN, 1)
     _, tail = rest.split(_PARAMS_END, 1)
     block = generate_top_localparams(
-        data_widths['in'], slots['in'], data_widths['out'], slots['out'], flow,
-        in_elems=n_words['in'], out_elems=n_words['out'],
+        data_widths['in'], slots['in'], data_widths['out'], slots['out'], flow
     )
     top.write_text(f'{head}{_PARAMS_BEGIN}\n{block}\n{_PARAMS_END}{tail}')
 

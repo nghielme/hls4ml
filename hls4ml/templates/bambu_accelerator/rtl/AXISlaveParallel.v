@@ -52,16 +52,8 @@ module AXISlaveParallel #(
 		parameter	[0:0]	OPT_LOWPOWER = 1'b0,
 		parameter HLS_IN_DATA_W   = 16,
 		parameter HLS_OUT_DATA_W  = 16,
-		// BRAM DEPTHS (2**addr_width).  Size the register arrays and the
-		// address decode.  Must NOT be the element count: at a
-		// non-power-of-two value NxMap deletes the whole datapath.
 		parameter HLS_IN_N_WORDS  = 8,
 		parameter HLS_OUT_N_WORDS = 8,
-		// ELEMENT COUNTS.  Used only for the AXI beat arithmetic, so the
-		// beat geometry matches what the firmware computes from the same
-		// counts.  Default to the depths for standalone/sim instantiation.
-		parameter HLS_IN_N_ELEMS  = HLS_IN_N_WORDS,
-		parameter HLS_OUT_N_ELEMS = HLS_OUT_N_WORDS,
 		parameter HLS_IN_ADDR_W   = 3,
 		parameter HLS_OUT_ADDR_W  = 3
 		// }}}
@@ -1026,12 +1018,8 @@ module AXISlaveParallel #(
     // ==========================================
     localparam WORDS_PER_IN_BEAT  = C_S_AXI_DATA_WIDTH / HLS_IN_DATA_W;
     localparam WORDS_PER_OUT_BEAT = C_S_AXI_DATA_WIDTH / HLS_OUT_DATA_W;
-    // Beat counts come from the ELEMENT counts, not the depths: the firmware
-    // computes ceil(n_elems * sizeof(container) / 16) beats and the two sides
-    // must agree exactly, or the cycle-counter beat lands on padding (and a
-    // short read burst hangs the DMA).
-    localparam N_BEATS_IN     = (HLS_IN_N_ELEMS  + WORDS_PER_IN_BEAT  - 1) / WORDS_PER_IN_BEAT;
-    localparam N_BEATS_OUT    = (HLS_OUT_N_ELEMS + WORDS_PER_OUT_BEAT - 1) / WORDS_PER_OUT_BEAT;
+    localparam N_BEATS_IN     = (HLS_IN_N_WORDS  + WORDS_PER_IN_BEAT  - 1) / WORDS_PER_IN_BEAT;
+    localparam N_BEATS_OUT    = (HLS_OUT_N_WORDS + WORDS_PER_OUT_BEAT - 1) / WORDS_PER_OUT_BEAT;
     localparam N_BEATS_CYCLES = 1;
     localparam N_BEATS_TOTAL  = N_BEATS_OUT + N_BEATS_CYCLES;
 
@@ -1182,15 +1170,11 @@ module AXISlaveParallel #(
         end
     end
 
-    // --- output_flat_padded: exactly N_BEATS_OUT whole AXI beats ---
-    // The register array is HLS_OUT_N_WORDS (the BRAM depth) wide while the
-    // beats only cover HLS_OUT_N_ELEMS words, so either side can be larger:
-    //  - depth-derived flat bus narrower than the beats: zero-pad the MSBs
-    //    (a variable part-select past a wire's declared width yields X).
-    //  - flat bus wider (the usual case now, e.g. 8*64=512 vs 3*128=384):
-    //    take the low bits, i.e. output words 0..N_BEATS_OUT*WORDS_PER_BEAT-1,
-    //    which covers elements 0..HLS_OUT_N_ELEMS-1. The dropped MSBs are the
-    //    never-written padding slots between the elements and the depth.
+    // --- output_flat_padded: zero-extend to a whole number of AXI beats ---
+    // When HLS_OUT_N_WORDS is not a multiple of WORDS_PER_BEAT the plain
+    // output_flat wire is narrower than N_BEATS_OUT*C_S_AXI_DATA_WIDTH.
+    // Variable part-selects beyond the wire's declared width return X in
+    // Icarus, so we pad the MSBs with zeros here.
     localparam OUT_FLAT_W = HLS_OUT_N_WORDS * HLS_OUT_DATA_W;
     localparam OUT_PAD_W  = N_BEATS_OUT * C_S_AXI_DATA_WIDTH;
     wire [OUT_PAD_W-1:0] output_flat_padded;
@@ -1199,7 +1183,7 @@ module AXISlaveParallel #(
             assign output_flat_padded =
                 {{(OUT_PAD_W - OUT_FLAT_W){1'b0}}, output_flat};
         end else begin : gen_out_nopad
-            assign output_flat_padded = output_flat[OUT_PAD_W-1:0];
+            assign output_flat_padded = output_flat;
         end
     endgenerate
 
