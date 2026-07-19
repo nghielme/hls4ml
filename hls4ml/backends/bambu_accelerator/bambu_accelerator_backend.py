@@ -222,8 +222,12 @@ def _patch_params(project_dir: str, flow: str, data_widths: dict,
     N_BEATS_OUT=ceil(8/2)=4, while fpga_inference.c reads it at the offset
     implied by the element count (beat 3).  The DMA no longer hangs -- the
     firmware requests 4 beats and the slave offers 5 -- but fpga_exec_cycles
-    reads padding.  Proper fix is a separate element-count parameter on
-    AXISlaveParallel for the beat math; tracked, not done here.
+    reads padding.  The natural fix -- a separate element-count parameter on
+    AXISlaveParallel for the beat math -- WAS ATTEMPTED AND REVERTED: it passed
+    simulation, review, and P&R (carry4 identical to this baseline) and still
+    produced a bitstream that does not boot the NG-ULTRA board, reproducibly
+    (see the revert of 3fc01942).  No mechanism was identified.  Any retry must
+    be validated on hardware; every offline signal said the change was safe.
 
     Stream keeps the element count: AXISlaveStream's LAST_BEAT_*_VALID is
     genuinely a count of valid words in the final beat, and that path is
