@@ -319,7 +319,8 @@ def extract_bram_depths(port_names: list[str], port_decls: PortDecls,
 
 
 def generate_top_localparams(in_dw: int, in_n: int, out_dw: int, out_n: int,
-                             flow: str) -> str:
+                             flow: str, in_elems: int | None = None,
+                             out_elems: int | None = None) -> str:
     """Return the localparam block string for top_parallel.v / top_stream.v.
 
     `in_n`/`out_n` are BRAM DEPTHS for the parallel flow (see
@@ -328,9 +329,17 @@ def generate_top_localparams(in_dw: int, in_n: int, out_dw: int, out_n: int,
     LAST_BEAT_*_VALID arithmetic needs the true count).  The caller routes it;
     this function only formats.
 
-    Parallel flow emits the four HLS_*_DATA_W / HLS_*_N_WORDS parameters plus
-    the two derived HLS_*_ADDR_W widths that AXISlaveParallel needs.
-    Stream flow skips the ADDR_W lines (AXISlaveStream doesn't use them).
+    `in_elems`/`out_elems` are the true element counts, emitted as
+    HLS_*_N_ELEMS for the parallel flow only.  AXISlaveParallel derives its
+    AXI beat counts from these, so the beat geometry matches the firmware's
+    ceil(n * sizeof(container) / 16); the depths keep sizing the register
+    arrays and the address decode.  Omitted -> falls back to the depths
+    (the pre-split behaviour).  Ignored for the stream flow, where
+    HLS_*_N_WORDS already is the element count.
+
+    Parallel flow emits the four HLS_*_DATA_W / HLS_*_N_WORDS parameters, the
+    two HLS_*_N_ELEMS counts, plus the two derived HLS_*_ADDR_W widths that
+    AXISlaveParallel needs.  Stream flow emits only the first four.
     """
     lines = [
         f'localparam HLS_IN_DATA_W   = {in_dw};',
@@ -340,6 +349,8 @@ def generate_top_localparams(in_dw: int, in_n: int, out_dw: int, out_n: int,
     ]
     if flow != 'stream':
         lines += [
+            f'localparam HLS_IN_N_ELEMS  = {in_n if in_elems is None else in_elems};',
+            f'localparam HLS_OUT_N_ELEMS = {out_n if out_elems is None else out_elems};',
             'localparam HLS_IN_ADDR_W   = (HLS_IN_N_WORDS  > 1) ? $clog2(HLS_IN_N_WORDS)  : 1;',
             'localparam HLS_OUT_ADDR_W  = (HLS_OUT_N_WORDS > 1) ? $clog2(HLS_OUT_N_WORDS) : 1;',
         ]

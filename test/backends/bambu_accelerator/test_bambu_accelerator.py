@@ -347,11 +347,50 @@ def test_patch_params_writes_model_geometry(tmp_path):
     _patch_params(str(d), 'parallel', m['data_widths'], m['n_words'], m['bram_slots'])
 
     after = _localparams(tmp_path / 'top_parallel.v')
-    # BRAM depths 8/16 -- differ from both the template defaults (16/4) and
-    # the element counts (5/9), so this fails under either bug.
+    # N_WORDS = BRAM depths 8/16, N_ELEMS = element counts 5/9.  All four
+    # differ from the template defaults (16/4) AND from each other, so this
+    # fails if the two are ever conflated in either direction: the depth in
+    # N_ELEMS breaks the AXI beat arithmetic (wrong cycle-counter beat, or an
+    # input FSM waiting for beats the firmware never sends), the count in
+    # N_WORDS makes NxMap delete the datapath.
     assert after == {'HLS_IN_DATA_W': 8, 'HLS_OUT_DATA_W': 8,
-                     'HLS_IN_N_WORDS': 8, 'HLS_OUT_N_WORDS': 16}
+                     'HLS_IN_N_WORDS': 8, 'HLS_OUT_N_WORDS': 16,
+                     'HLS_IN_N_ELEMS': 5, 'HLS_OUT_N_ELEMS': 9}
     assert '_ADDR_W' in (tmp_path / 'top_parallel.v').read_text()
+
+
+def test_patch_params_parallel_beat_counts_match_firmware(tmp_path):
+    """The slave's N_BEATS_* must equal what fpga_inference.c computes.
+
+    Firmware: FPGA_ROUND_UP_TO_BEAT(n * sizeof(container)) / 16 beats, plus
+    one for the cycle counter.  RTL: ceil(N_ELEMS / (128 / DATA_W)).  For the
+    jet-tagger (n_out=5, 64-bit containers) that is 3 output beats with the
+    counter at beat 3 / byte offset 48 -- not the 4 the 8-slot depth implies.
+    """
+    from hls4ml.backends.bambu_accelerator.bambu_accelerator_backend import _patch_params
+
+    _copy_top(tmp_path, 'parallel')
+    _patch_params(str(tmp_path), 'parallel', {'in': 16, 'out': 64},
+                  {'in': 16, 'out': 5}, {'in': 16, 'out': 8})
+    p = _localparams(tmp_path / 'top_parallel.v')
+
+    def rtl_beats(n_elems, data_w):
+        words_per_beat = 128 // data_w
+        return -(-n_elems // words_per_beat)
+
+    def fw_beats(n, container_bytes):
+        # FPGA_ROUND_UP_TO_BEAT(n * sizeof(container_t)) / FPGA_AXI_BUS_BYTES
+        return -(-(n * container_bytes) // 16)
+
+    # The whole equivalence rests on HLS_*_DATA_W being the CONTAINER width,
+    # i.e. 8 * sizeof(container_t) in fpga_inference.h. Derive it rather than
+    # hardcoding, so the test fails if that invariant ever breaks.
+    in_cb = p['HLS_IN_DATA_W'] // 8
+    out_cb = p['HLS_OUT_DATA_W'] // 8
+    assert (in_cb, out_cb) == (2, 8)
+
+    assert rtl_beats(p['HLS_IN_N_ELEMS'], p['HLS_IN_DATA_W']) == fw_beats(16, in_cb) == 2
+    assert rtl_beats(p['HLS_OUT_N_ELEMS'], p['HLS_OUT_DATA_W']) == fw_beats(5, out_cb) == 3
 
 
 def test_patch_params_stream_uses_element_counts(tmp_path):
