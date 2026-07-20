@@ -82,7 +82,7 @@ def test_csimulation(test_case_id, simple_model, tmp_path, io_type, strategy, gr
 @pytest.mark.parametrize('granularity', ['name'])
 @pytest.mark.parametrize('batch_size', [10])
 @pytest.mark.parametrize('backend', ['Vitis', 'Bambu'])
-@pytest.mark.parametrize('part', ['nx2h540tsc', 'xc7a100tcsg324-1'])
+@pytest.mark.parametrize('part', ['xc7a100tcsg324-1'])
 def test_cosimulation(test_case_id, simple_model, tmp_path, io_type, strategy, granularity, batch_size, backend, part):
     output_dir = str(test_root_path / test_case_id)
 
@@ -162,12 +162,13 @@ def test_synth(test_case_id, simple_model, io_type, strategy, granularity, backe
 @pytest.mark.parametrize('strategy', ['latency'])
 @pytest.mark.parametrize('granularity', ['name'])
 @pytest.mark.parametrize('backend', ['Vitis', 'Bambu'])
-@pytest.mark.parametrize('part', ['nx2h540tsc', 'xc7a100tcsg324-1'])
+@pytest.mark.parametrize('part', ['xc7a100tcsg324-1'])
 def test_vsynth(test_case_id, simple_model, io_type, strategy, granularity, backend, part):
     """Test that a successful vsynth run produces the desired reports.
-    Sweeps a NanoXplore (`nx2h540tsc`) and a 7-Series Artix
-    (`xc7a100tcsg324-1`) target so the Bambu flow is exercised on both
-    target families.
+
+    `part` stays parametrized so a target can be added, but the sweep is the
+    backend's own default 7-Series Artix. NanoXplore targets route into
+    family-specific branches and belong with the accelerator-layer tests.
     """
     vsynth_proj_dir = test_root_path / test_case_id
 
