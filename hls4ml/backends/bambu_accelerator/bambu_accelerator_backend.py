@@ -218,16 +218,18 @@ def _patch_params(project_dir: str, flow: str, data_widths: dict,
     N_WORDS=5 makes NxMap delete the whole datapath (144 LUT4 / 0 carry vs
     3329 / 7794 at N_WORDS=8).  See extract_bram_depths.
 
-    KNOWN GAP: at the depth the slave puts its cycle-counter beat at index
-    N_BEATS_OUT=ceil(8/2)=4, while fpga_inference.c reads it at the offset
-    implied by the element count (beat 3).  The DMA no longer hangs -- the
-    firmware requests 4 beats and the slave offers 5 -- but fpga_exec_cycles
-    reads padding.  The natural fix -- a separate element-count parameter on
-    AXISlaveParallel for the beat math -- WAS ATTEMPTED AND REVERTED: it passed
-    simulation, review, and P&R (carry4 identical to this baseline) and still
-    produced a bitstream that does not boot the NG-ULTRA board, reproducibly
-    (see the revert of 3fc01942).  No mechanism was identified.  Any retry must
-    be validated on hardware; every offline signal said the change was safe.
+    A consequence worth knowing downstream: at the depth, the slave places its
+    cycle-counter beat at N_BEATS_OUT = ceil(depth / words_per_beat), which is
+    past the last beat holding real data.  A reader that locates the counter
+    from the element count instead will read padding.  The geometry needed to
+    find it is published in the manifest (`bram_slots`), so consumers can
+    derive the same beat index this function used.
+
+    Do NOT "fix" that by giving the RTL a separate element-count parameter for
+    the beat math while leaving N_WORDS at the depth: that combination has been
+    measured to break the datapath on NG-ULTRA.  Validate any change here on
+    hardware -- offline signals (simulation, resource counts, timing) do not
+    catch it.
 
     Stream keeps the element count: AXISlaveStream's LAST_BEAT_*_VALID is
     genuinely a count of valid words in the final beat, and that path is
