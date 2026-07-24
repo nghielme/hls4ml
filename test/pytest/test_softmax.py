@@ -43,6 +43,18 @@ def test_softmax(test_case_id, backend, strategy, generate_data, input_bits, inp
 
     table_type = f'fixed<{table_bits}, RND, SAT>'
 
+    if backend == 'Bambu':
+        # Bambu emits the softmax inverse LUT as a constexpr std::array. When
+        # fix_softmax_table_size shrinks the table (2**min(input_bw, table_bw) <
+        # table_size, default 1024), the constexpr initializer divides by zero
+        # while clang evaluates it at compile time and the build is rejected.
+        # Vivado/Vitis fill the LUT at runtime and are unaffected. See
+        # docs/backend/bambu.rst.
+        input_bw = int(input_bits.split(',')[0])
+        table_bw = int(table_bits.split(',')[0])
+        if 2 ** min(input_bw, table_bw) < 1024:
+            pytest.skip('Bambu cannot compile a resized softmax constexpr LUT (see docs/backend/bambu.rst)')
+
     cfg = hls4ml.utils.config_from_keras_model(model, granularity='name', backend=backend)
     cfg['LayerName']['softmax']['Strategy'] = strategy
     cfg['LayerName']['softmax']['inv_table_t'] = table_type
