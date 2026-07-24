@@ -1,9 +1,9 @@
 import os
-from pathlib import Path
 import re
 import shlex
 import shutil
 import subprocess
+from pathlib import Path
 from warnings import warn
 
 import numpy as np
@@ -49,54 +49,50 @@ from hls4ml.report import parse_bambu_report
 from hls4ml.utils import attribute_descriptions as descriptions
 from hls4ml.utils.einsum_utils import parse_einsum
 
-
 partname_to_bambu = {
     # Intel/Altera
-    "5CSEMA5F31C6"      : {"device_name" : "5CSEMA5F31C6", "family" : "Intel/Altera"},
-    "5SGXEA7N2F45C1"    : {"device_name" : "5SGXEA7N2F45C1", "family" : "Intel/Altera"},
-    "EP2C70F896C6"      : {"device_name" : "EP2C70F896C6", "family" : "Intel/Altera"},
-    "EP2C70F896C6-R"    : {"device_name" : "EP2C70F896C6-R", "family" : "Intel/Altera"},
-    "EP4SGX530KH40C2"   : {"device_name" : "EP4SGX530KH40C2", "family" : "Intel/Altera"},
+    '5CSEMA5F31C6': {'device_name': '5CSEMA5F31C6', 'family': 'Intel/Altera'},
+    '5SGXEA7N2F45C1': {'device_name': '5SGXEA7N2F45C1', 'family': 'Intel/Altera'},
+    'EP2C70F896C6': {'device_name': 'EP2C70F896C6', 'family': 'Intel/Altera'},
+    'EP2C70F896C6-R': {'device_name': 'EP2C70F896C6-R', 'family': 'Intel/Altera'},
+    'EP4SGX530KH40C2': {'device_name': 'EP4SGX530KH40C2', 'family': 'Intel/Altera'},
     # : "LFE335EA8FN484C",
-    # : "LFE5U85F8BG756C", 
-    # : "LFE5UM85F8BG756C", 
-
+    # : "LFE5U85F8BG756C",
+    # : "LFE5UM85F8BG756C",
     # ASAP7 (ASIC)
-    # : "asap7-BC", 
-    # : "asap7-TC", 
-    # : "asap7-WC", 
-    
-    # Standard cells / tech libraries 
-    # : "nangate45", 
-
+    # : "asap7-BC",
+    # : "asap7-TC",
+    # : "asap7-WC",
+    # Standard cells / tech libraries
+    # : "nangate45",
     # NaNGate/Nextgrids
     # : "nx1h140tsp",
     # : "nx1h35S",
-    "nx2h540tsc" : {"device_name" : "nx2h540tsc", "family" : "NanoXplore"}, 
-
+    'nx2h540tsc': {'device_name': 'nx2h540tsc', 'family': 'NanoXplore'},
     # Xilinx legacy
-    # : "xc4vlx100-10ff1513", 
-    # : "xc5vlx110t-1ff1136", 
-    # : "xc5vlx330t-2ff1738", 
+    # : "xc4vlx100-10ff1513",
+    # : "xc5vlx110t-1ff1136",
+    # : "xc5vlx330t-2ff1738",
     # : "xc5vlx50-3ff1153",
-    # : "xc6vlx240t-1ff1156", 
-
+    # : "xc6vlx240t-1ff1156",
     # 7-series
-    "xc7a100tcsg324-1" : {"device_name" : "xc7a100t-1csg324", "family" : "Xilinx"}, # 7-series Artix; matches the entry in Bambu's `Available devices` listing
+    'xc7a100tcsg324-1': {
+        'device_name': 'xc7a100t-1csg324',
+        'family': 'Xilinx',
+    },  # 7-series Artix; matches the entry in Bambu's `Available devices` listing
     # : "xc7vx330t-1ffg1157",
     # : "xc7vx485t-2ffg1761",
-    # : "xc7vx690t-3ffg1930", 
+    # : "xc7vx690t-3ffg1930",
     # : "xc7z020-1clg484",
-    # : "xc7z020-1clg484-YOSYS", 
+    # : "xc7z020-1clg484-YOSYS",
     # : "xc7z045-2ffg900",
-
     # UltraScale / UltraScale+
     # : "xcku060-3ffva1156",
     # : "xcu250-2Lfigd2104",
     # : "xcu280-2Lfsvh2892",
     # : "xcu50-2fsvh2104",
-    "xczu7ev-ffvc1156-2-e" : {"device_name" : "xczu7ev-2ffvc1156", "family" : "Xilinx"},
-    "xcu55c-fsvh2892-2L-e" : {"device_name" : "xcu55c-2Lfsvh2892", "family" : "Xilinx"}
+    'xczu7ev-ffvc1156-2-e': {'device_name': 'xczu7ev-2ffvc1156', 'family': 'Xilinx'},
+    'xcu55c-fsvh2892-2L-e': {'device_name': 'xcu55c-2Lfsvh2892', 'family': 'Xilinx'},
 }
 
 
@@ -380,7 +376,7 @@ class BambuBackend(FPGABackend):
             cosim (bool, optional): Run RTL-Cosimulation of model on its testbench. Defaults to false.
             validation (bool, optional): Checks for bitwise equality of csim and cosim results.
             export (bool, optional): NotImplemented (will create exported IP in project directory)
-            vsynth (bool, optional): 
+            vsynth (bool, optional):
                 Optimize, Place, and Route synthesized design for any part that is supported by
                 Bambu. User will need the part downloaded in their Vivado installation.
                 Bambu requires cosim=True to run vsynth.
@@ -411,13 +407,13 @@ class BambuBackend(FPGABackend):
                 cosim=True,
                 validation=True,
                 log_to_stdout=True
-                args='-v4 --seed=5' 
+                args='-v4 --seed=5'
             )
         """
 
         project_name = model.config.get_project_name()
         project_dir = model.config.get_output_dir()
-        part_family = model.config.get_config_value("FPGAFamily")
+        part_family = model.config.get_config_value('FPGAFamily')
         # Bambu's InterfaceInfer pass (ChasePointerInterfaceRecurse) has a
         # 64-bit-pointer bug that fires only on the ac_channel FIFO ports
         # io_stream generates ("unexpected condition",
@@ -449,36 +445,41 @@ class BambuBackend(FPGABackend):
             # writer copies into firmware/ac_types, with a 64-bit host triple.
             # The -m64 this needs trips Bambu's InterfaceInfer 64-bit pointer
             # bug on io_stream's ac_channel FIFOs, so it is filtered below.
-            REQ_ARGS = ['-lm',
-                        '-Ifirmware/ac_types',
-                        '--compiler=I386_CLANG16',
-                        CC_TEMPLATE_DEPTH,
-                        '--generate-interface=INFER',
-                        '-v4',
-                        '-m64'
-                       ]
+            REQ_ARGS = [
+                '-lm',
+                '-Ifirmware/ac_types',
+                '--compiler=I386_CLANG16',
+                CC_TEMPLATE_DEPTH,
+                '--generate-interface=INFER',
+                '-v4',
+                '-m64',
+            ]
         else:
             # Default: Bambu's own shipped ac/ap headers (usr/include/panda),
             # always in sync with the toolchain, 32-bit triple — no -m64
             # needed, which also sidesteps the InterfaceInfer io_stream bug.
-            REQ_ARGS = ['-lm',
-                        '--compiler=I386_CLANG16',
-                        CC_TEMPLATE_DEPTH,
-                        '--generate-interface=INFER',
-                        '-v4'
-                       ]
+            REQ_ARGS = ['-lm', '--compiler=I386_CLANG16', CC_TEMPLATE_DEPTH, '--generate-interface=INFER', '-v4']
         if io_type == 'io_stream':
             REQ_ARGS = [arg for arg in REQ_ARGS if arg != '-m64']
-        CMD_ARGS      = []
-        
+        CMD_ARGS = []
+
         result = {}
 
         ### RESET ###
         bambu_output_patterns = [
-            "HLS_output", "panda-temp", "vivado_reports", "bambu_results*.xml", 
-            "evaluate*.sh", "memory_allocation*.xml", f"{project_name}-*_tb.exe", 
-            f"{project_name}.v", "results.txt", "synthesize*.sh", "panda_libtech.v", "*.mem"       
-            ]
+            'HLS_output',
+            'panda-temp',
+            'vivado_reports',
+            'bambu_results*.xml',
+            'evaluate*.sh',
+            'memory_allocation*.xml',
+            f'{project_name}-*_tb.exe',
+            f'{project_name}.v',
+            'results.txt',
+            'synthesize*.sh',
+            'panda_libtech.v',
+            '*.mem',
+        ]
         matches = [p for pat in bambu_output_patterns for p in Path(project_dir).glob(pat)]
         is_dirty_directory = any(matches)
         if reset:
@@ -488,10 +489,12 @@ class BambuBackend(FPGABackend):
                         p.unlink(missing_ok=True)
                     elif p.is_dir():
                         shutil.rmtree(p, ignore_errors=True)
-                    print(f"Removed: {p}")
+                    print(f'Removed: {p}')
         else:
             if is_dirty_directory:
-                warn("WARNING: Bambu is being rerun on a directory instead of running on a fresh directory (not recommended).")
+                warn(
+                    'WARNING: Bambu is being rerun on a directory instead of running on a fresh directory (not recommended).'
+                )
 
         ### CSIM ###
         if csim:
@@ -499,35 +502,34 @@ class BambuBackend(FPGABackend):
 
             # Execute testbench
             ret = subprocess.run(
-                [f"./{project_name}-{model.config.get_config_value('Stamp')}_tb.exe"],
+                [f'./{project_name}-{model.config.get_config_value("Stamp")}_tb.exe'],
                 cwd=project_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                capture_output=True,
                 text=True,
             )
 
             if ret.returncode != 0:
-                raise RuntimeError(
-                f'C++ testbench execution failed:\nSTDOUT:\n{ret.stdout}\nSTDERR:\n{ret.stderr}'
-            )
-                
+                raise RuntimeError(f'C++ testbench execution failed:\nSTDOUT:\n{ret.stdout}\nSTDERR:\n{ret.stderr}')
+
         if synth:
             clock_period = model.config.get_config_value('ClockPeriod')
-            part_name = model.config.get_config_value('Part') # Bambu uses its own 'device name' which does NOT always coincide with part name
-            device_name = partname_to_bambu.get(part_name, {}).get("device_name", None)
+            part_name = model.config.get_config_value(
+                'Part'
+            )  # Bambu uses its own 'device name' which does NOT always coincide with part name
+            device_name = partname_to_bambu.get(part_name, {}).get('device_name', None)
             if device_name is None:
                 warn(
-                    f"WARNING: Part name {part_name} has no registered mapping to a Bambu --device-name. "
+                    f'WARNING: Part name {part_name} has no registered mapping to a Bambu --device-name. '
                     f"Using '--device-name={part_name}'. "
                     "(See valid Bambu device names by running Bambu with High Verbosity flag '-v4')"
                 )
                 device_name = part_name
             CMD_ARGS += [f'--device-name={device_name}', f'--clock-period={clock_period}']
-            
+
         ### COSIM ###
         if cosim:
             if not synth:
-                raise ValueError("To run RTL cosimulation, C/RTL synthesis must be run.")
+                raise ValueError('To run RTL cosimulation, C/RTL synthesis must be run.')
             CMD_ARGS += [f'--generate-tb={self._get_cosim_testbench(project_name)}', '--simulate', '-DRTL_SIM']
 
             # Force Verilator for NanoXplore parts. Bambu's default
@@ -537,32 +539,31 @@ class BambuBackend(FPGABackend):
             # toolchain-agnostic and works for cosim regardless of the
             # target FPGA family.
             part_name = model.config.get_config_value('Part')
-            family = partname_to_bambu.get(part_name, {}).get("family", None)
+            family = partname_to_bambu.get(part_name, {}).get('family', None)
             if family == 'NanoXplore':
                 CMD_ARGS += ['--simulator=VERILATOR']
 
         ### VALIDATION ###
         if validation:
             if not csim or not cosim:
-                raise ValueError("To validate C simulation & RTL simulation equality, csim and cosim must both be run.")
+                raise ValueError('To validate C simulation & RTL simulation equality, csim and cosim must both be run.')
 
         ### EXPORT ###
         if export:
-            raise NotImplementedError() # TODO - Requires an ad-hoc .tcl script
+            raise NotImplementedError()  # TODO - Requires an ad-hoc .tcl script
 
         ### VSYNTH ###
         if vsynth:
             if not synth:
-                raise ValueError("To synthesize for specific part, C/RTL synthesis must be run.")
+                raise ValueError('To synthesize for specific part, C/RTL synthesis must be run.')
             if not cosim:
-                raise ValueError("To synthesize for specific part in Bambu, RTL cosimulation must be run.")
+                raise ValueError('To synthesize for specific part in Bambu, RTL cosimulation must be run.')
 
             CMD_ARGS += ['--evaluation']
-            
-        ### FIFO_OPT ### 
-        if fifo_opt:
-            raise NotImplementedError() # TODO - Requires an ad-hoc .tcl script
 
+        ### FIFO_OPT ###
+        if fifo_opt:
+            raise NotImplementedError()  # TODO - Requires an ad-hoc .tcl script
 
         # Build user's custom command with Bambu defaults
         command_tokens = BASE_COMMAND + REQ_ARGS + CMD_ARGS
@@ -571,23 +572,16 @@ class BambuBackend(FPGABackend):
         command_str = ' '.join(shlex.quote(str(token)) for token in command_tokens)
 
         # Write/rewrite formatted command to build_bambu.sh for later execution
-        script_path = Path(project_dir) / "build_bambu.sh"
+        script_path = Path(project_dir) / 'build_bambu.sh'
         content = script_path.read_text()
         content = self._replace_block(
-            content,
-            "# HLS4ML insert_bambu_command BEGIN",
-            "# HLS4ML insert_bambu_command END",
-            command_str
+            content, '# HLS4ML insert_bambu_command BEGIN', '# HLS4ML insert_bambu_command END', command_str
         )
-        copy_code = self._final_report_copying_code(part_family) if vsynth else ""
+        copy_code = self._final_report_copying_code(part_family) if vsynth else ''
         content = self._replace_block(
-            content,
-            "# HLS4ML insert_final_report_copying BEGIN",
-            "# HLS4ML insert_final_report_copying END",
-            copy_code
+            content, '# HLS4ML insert_final_report_copying BEGIN', '# HLS4ML insert_final_report_copying END', copy_code
         )
         script_path.write_text(content)
-
 
         if not synth:
             # "Dry run"
@@ -645,7 +639,7 @@ class BambuBackend(FPGABackend):
                     stderr=stderr_target,
                     env=run_env,
                     text=run_kwargs.get('text', True),
-                    **run_kwargs
+                    **run_kwargs,
                 )
                 process.communicate()
             finally:
@@ -653,6 +647,17 @@ class BambuBackend(FPGABackend):
                     stdout_target.close()
                 if stderr_target is not None and stderr_target is not subprocess.PIPE:
                     stderr_target.close()
+
+            # A failed Bambu run must not fall through to report parsing: the reports
+            # would either be missing (yielding an empty result that looks like success)
+            # or left over from an earlier run when reset=False.
+            if process.returncode != 0:
+                logs = '' if log_to_stdout else f'\n  stdout log: {stdout_log}\n  stderr log: {stderr_log}'
+                raise RuntimeError(
+                    f'Bambu build failed with exit code {process.returncode}.\n'
+                    f'  command: {build_command}\n'
+                    f'  directory: {output_dir}{logs}'
+                )
 
             # Add main results
             result.update(parse_bambu_report(project_dir, part_family))
@@ -675,15 +680,14 @@ class BambuBackend(FPGABackend):
         ret = subprocess.run(
             ['bash', 'build_tb_exe.sh'],
             text=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
             cwd=model.config.get_output_dir(),
         )
         if ret.returncode != 0:
             raise RuntimeError(
                 f'Failed to build testbench executable for "{model.config.get_project_name()}":\nSTDOUT:\n{ret.stdout}\nSTDERR:\n{ret.stderr}'
             )
-        
+
     def _final_report_copying_code(self, family):
         """Aggregate final reports in one directory based on Part Family/Software used"""
         if family == 'Xilinx':
@@ -691,25 +695,24 @@ class BambuBackend(FPGABackend):
             # (`HLS_output/Synthesis/vivado_flow` in older versions,
             # `HLS_output/xilinx/flow_backend` in current). Search the full
             # HLS_output tree so the script keeps working across versions.
-            return(
+            return (
                 'src_root="HLS_output"\n'
                 'dst_root="vivado_reports"\n'
                 'mkdir -p "$dst_root"\n'
                 r'find "$src_root" -type f \( -iname "*.rpt" -o -iname "*.xml" \) -exec cp -p {} "$dst_root"/ \;'
             )
-        else: # TODO: Add more parsing code for different families/softwares
-            return ""
+        else:  # TODO: Add more parsing code for different families/softwares
+            return ''
 
     def _replace_block(self, content, start, end, new_body):
-        pattern = rf"{start}.*?{end}"
-        replacement = f"{start}\n{new_body}\n{end}"
+        pattern = rf'{start}.*?{end}'
+        replacement = f'{start}\n{new_body}\n{end}'
         return re.sub(pattern, replacement, content, flags=re.S)
-
 
     @staticmethod
     def _ensure_bambu_available():
         if shutil.which('bambu') is None:
-            raise EnvironmentError('Bambu HLS installation not found. Make sure "bambu" is on PATH.')
+            raise OSError('Bambu HLS installation not found. Make sure "bambu" is on PATH.')
 
     @staticmethod
     def _normalize_bambu_command(args):
@@ -1154,7 +1157,9 @@ class BambuBackend(FPGABackend):
     def init_garnet(self, layer):
         reuse_factor = layer.attributes['reuse_factor']
 
-        var_converter = BambuArrayVariableConverter(type_converter=BambuHLSTypeConverter(precision_converter=APTypeConverter()))
+        var_converter = BambuArrayVariableConverter(
+            type_converter=BambuHLSTypeConverter(precision_converter=APTypeConverter())
+        )
 
         # A bit controversial but we are going to set the partitioning of the input here
         in_layer = layer.model.graph[layer.inputs[0]]
