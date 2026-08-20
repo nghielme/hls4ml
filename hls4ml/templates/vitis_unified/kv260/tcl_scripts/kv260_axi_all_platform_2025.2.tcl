@@ -20,7 +20,7 @@ set script_folder [_tcl::get_script_folder]
 ################################################################
 # Check if script is running in correct Vivado version.
 ################################################################
-set scripts_vivado_version 2023.2
+set scripts_vivado_version 2025.2
 set current_vivado_version [version -short]
 
 if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
@@ -49,11 +49,10 @@ if { [string first $scripts_vivado_version $current_vivado_version] == -1 } {
 
 set list_projs [get_projects -quiet]
 if { $list_projs eq "" } {
-   create_project project_1 myproj -part xck26-sfvc784-2LV-c
-   set_property board_part xilinx.com:kv260_som:part0:1.4 [current_project]
-   set_property board_connections {som240_1_connector xilinx.com:kv260_carrier:som240_1_connector:1.3} [current_project]
+   create_project project_1 myproj -part xck26-sfvc784-2LV-c -force
+   set_property BOARD_PART xilinx.com:kv260_som:part0:1.4 [current_project]
+  set_property BOARD_CONNECTIONS { som240_1_connector xilinx.com:kv260_carrier:som240_1_connector:1.3} [current_project]
 }
-set_property platform.extensible true [current_project]
 
 
 # CHANGE DESIGN NAME HERE
@@ -616,8 +615,6 @@ MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 
     CONFIG.PSU__CRF_APB__DBG_FPD_CTRL__ACT_FREQMHZ {249.997498} \
     CONFIG.PSU__CRF_APB__DBG_FPD_CTRL__FREQMHZ {250} \
     CONFIG.PSU__CRF_APB__DBG_FPD_CTRL__SRCSEL {IOPLL} \
-    CONFIG.PSU__CRF_APB__DBG_TRACE_CTRL__ACT_FREQMHZ {250} \
-    CONFIG.PSU__CRF_APB__DBG_TRACE_CTRL__FREQMHZ {250} \
     CONFIG.PSU__CRF_APB__DBG_TRACE_CTRL__SRCSEL {IOPLL} \
     CONFIG.PSU__CRF_APB__DBG_TSTMP_CTRL__ACT_FREQMHZ {249.997498} \
     CONFIG.PSU__CRF_APB__DBG_TSTMP_CTRL__FREQMHZ {250} \
@@ -1092,11 +1089,12 @@ MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 MIO#GPIO0 
     CONFIG.PSU__PRESET_APPLIED {1} \
     CONFIG.PSU__PROTECTION__DDR_SEGMENTS {NONE} \
     CONFIG.PSU__PROTECTION__ENABLE {0} \
-    CONFIG.PSU__PROTECTION__FPD_SEGMENTS {SA:0xFD1A0000; SIZE:1280; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware| SA:0xFD000000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write;\
-subsystemId:PMU Firmware| SA:0xFD010000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware| SA:0xFD020000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU\
-Firmware| SA:0xFD030000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware| SA:0xFD040000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware|\
-SA:0xFD050000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware| SA:0xFD610000; SIZE:512; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware| SA:0xFD5D0000;\
-SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware|SA:0xFD1A0000 ; SIZE:1280; UNIT:KB; RegionTZ:Secure ; WrAllowed:Read/Write; subsystemId:Secure Subsystem} \
+    CONFIG.PSU__PROTECTION__FPD_SEGMENTS {SA:0xFD1A0000; SIZE:1280; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware |  SA:0xFD000000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write;\
+subsystemId:PMU Firmware |  SA:0xFD010000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware |  SA:0xFD020000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU\
+Firmware |  SA:0xFD030000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware |  SA:0xFD040000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware\
+|  SA:0xFD050000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware |  SA:0xFD610000; SIZE:512; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware\
+|  SA:0xFD5D0000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware | SA:0xFD1A0000 ; SIZE:1280; UNIT:KB; RegionTZ:Secure ; WrAllowed:Read/Write; subsystemId:Secure Subsystem}\
+\
     CONFIG.PSU__PROTECTION__LPD_SEGMENTS {SA:0xFF980000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware| SA:0xFF5E0000; SIZE:2560; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write;\
 subsystemId:PMU Firmware| SA:0xFFCC0000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware| SA:0xFF180000; SIZE:768; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU\
 Firmware| SA:0xFF410000; SIZE:640; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware| SA:0xFFA70000; SIZE:64; UNIT:KB; RegionTZ:Secure; WrAllowed:Read/Write; subsystemId:PMU Firmware|\
@@ -1128,12 +1126,12 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
     CONFIG.PSU__RPU__POWER__ON {1} \
     CONFIG.PSU__SATA__PERIPHERAL__ENABLE {0} \
     CONFIG.PSU__SAXIGP0__DATA_WIDTH {128} \
-    CONFIG.PSU__SD0__CLK_100_SDR_OTAP_DLY {0x00} \
-    CONFIG.PSU__SD0__CLK_200_SDR_OTAP_DLY {0x00} \
-    CONFIG.PSU__SD0__CLK_50_DDR_ITAP_DLY {0x00} \
-    CONFIG.PSU__SD0__CLK_50_DDR_OTAP_DLY {0x00} \
-    CONFIG.PSU__SD0__CLK_50_SDR_ITAP_DLY {0x00} \
-    CONFIG.PSU__SD0__CLK_50_SDR_OTAP_DLY {0x00} \
+    CONFIG.PSU__SD0__CLK_100_SDR_OTAP_DLY {0x3} \
+    CONFIG.PSU__SD0__CLK_200_SDR_OTAP_DLY {0x3} \
+    CONFIG.PSU__SD0__CLK_50_DDR_ITAP_DLY {0x3D} \
+    CONFIG.PSU__SD0__CLK_50_DDR_OTAP_DLY {0x4} \
+    CONFIG.PSU__SD0__CLK_50_SDR_ITAP_DLY {0x15} \
+    CONFIG.PSU__SD0__CLK_50_SDR_OTAP_DLY {0x5} \
     CONFIG.PSU__SD0__PERIPHERAL__ENABLE {0} \
     CONFIG.PSU__SD0__RESET__ENABLE {0} \
     CONFIG.PSU__SD1_COHERENCY {0} \
@@ -1289,12 +1287,35 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   connect_bd_intf_net -intf_net zynq_ultra_ps_e_0_M_AXI_HPM0_LPD [get_bd_intf_pins zynq_ultra_ps_e_0/M_AXI_HPM0_LPD] [get_bd_intf_pins axi_interconnect_0/S00_AXI]
 
   # Create port connections
-  connect_bd_net -net axi_dma_0_s2mm_introut [get_bd_pins axi_dma_0/s2mm_introut] [get_bd_pins customIntr_0/In0]
-  connect_bd_net -net axi_intc_0_irq [get_bd_pins axi_intc_0/irq] [get_bd_pins zynq_ultra_ps_e_0/pl_ps_irq0]
-  connect_bd_net -net rst_ps8_0_99M_peripheral_aresetn [get_bd_pins rst_ps8_0_99M/peripheral_aresetn] [get_bd_pins axi_intc_0/s_axi_aresetn] [get_bd_pins axi_interconnect_0/ARESETN] [get_bd_pins axi_interconnect_0/S00_ARESETN] [get_bd_pins axi_interconnect_0/M00_ARESETN] [get_bd_pins axi_dma_0/axi_resetn] [get_bd_pins axi_interconnect_0/M01_ARESETN] [get_bd_pins axi_smc/aresetn]
-  connect_bd_net -net xlconcat_0_dout [get_bd_pins customIntr_0/dout] [get_bd_pins axi_intc_0/intr]
-  connect_bd_net -net zynq_ultra_ps_e_0_pl_clk0 [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] [get_bd_pins axi_intc_0/s_axi_aclk] [get_bd_pins rst_ps8_0_99M/slowest_sync_clk] [get_bd_pins axi_interconnect_0/ACLK] [get_bd_pins axi_interconnect_0/S00_ACLK] [get_bd_pins axi_interconnect_0/M00_ACLK] [get_bd_pins zynq_ultra_ps_e_0/maxihpm0_lpd_aclk] [get_bd_pins zynq_ultra_ps_e_0/saxihpc0_fpd_aclk] [get_bd_pins axi_dma_0/s_axi_lite_aclk] [get_bd_pins axi_interconnect_0/M01_ACLK] [get_bd_pins axi_smc/aclk] [get_bd_pins axi_dma_0/m_axi_mm2s_aclk] [get_bd_pins axi_dma_0/m_axi_s2mm_aclk]
-  connect_bd_net -net zynq_ultra_ps_e_0_pl_resetn0 [get_bd_pins zynq_ultra_ps_e_0/pl_resetn0] [get_bd_pins rst_ps8_0_99M/ext_reset_in]
+  connect_bd_net -net axi_dma_0_s2mm_introut  [get_bd_pins axi_dma_0/s2mm_introut] \
+  [get_bd_pins customIntr_0/In0]
+  connect_bd_net -net axi_intc_0_irq  [get_bd_pins axi_intc_0/irq] \
+  [get_bd_pins zynq_ultra_ps_e_0/pl_ps_irq0]
+  connect_bd_net -net rst_ps8_0_99M_peripheral_aresetn  [get_bd_pins rst_ps8_0_99M/peripheral_aresetn] \
+  [get_bd_pins axi_dma_0/axi_resetn] \
+  [get_bd_pins axi_intc_0/s_axi_aresetn] \
+  [get_bd_pins axi_interconnect_0/ARESETN] \
+  [get_bd_pins axi_interconnect_0/S00_ARESETN] \
+  [get_bd_pins axi_interconnect_0/M00_ARESETN] \
+  [get_bd_pins axi_interconnect_0/M01_ARESETN] \
+  [get_bd_pins axi_smc/aresetn]
+  connect_bd_net -net xlconcat_0_dout  [get_bd_pins customIntr_0/dout] \
+  [get_bd_pins axi_intc_0/intr]
+  connect_bd_net -net zynq_ultra_ps_e_0_pl_clk0  [get_bd_pins zynq_ultra_ps_e_0/pl_clk0] \
+  [get_bd_pins axi_dma_0/s_axi_lite_aclk] \
+  [get_bd_pins axi_dma_0/m_axi_mm2s_aclk] \
+  [get_bd_pins axi_dma_0/m_axi_s2mm_aclk] \
+  [get_bd_pins axi_intc_0/s_axi_aclk] \
+  [get_bd_pins axi_interconnect_0/ACLK] \
+  [get_bd_pins axi_interconnect_0/S00_ACLK] \
+  [get_bd_pins axi_interconnect_0/M00_ACLK] \
+  [get_bd_pins axi_interconnect_0/M01_ACLK] \
+  [get_bd_pins axi_smc/aclk] \
+  [get_bd_pins rst_ps8_0_99M/slowest_sync_clk] \
+  [get_bd_pins zynq_ultra_ps_e_0/maxihpm0_lpd_aclk] \
+  [get_bd_pins zynq_ultra_ps_e_0/saxihpc0_fpd_aclk]
+  connect_bd_net -net zynq_ultra_ps_e_0_pl_resetn0  [get_bd_pins zynq_ultra_ps_e_0/pl_resetn0] \
+  [get_bd_pins rst_ps8_0_99M/ext_reset_in]
 
   # Create address segments
   assign_bd_address -offset 0x00000000 -range 0x80000000 -target_address_space [get_bd_addr_spaces axi_dma_0/Data_MM2S] [get_bd_addr_segs zynq_ultra_ps_e_0/SAXIGP0/HPC0_DDR_LOW] -force
@@ -1305,9 +1326,9 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   assign_bd_address -offset 0x80010000 -range 0x00010000 -target_address_space [get_bd_addr_spaces zynq_ultra_ps_e_0/Data] [get_bd_addr_segs axi_intc_0/S_AXI/Reg] -force
 
   # Exclude Address Segments
-  exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces axi_dma_0/Data_MM2S] [get_bd_addr_segs zynq_ultra_ps_e_0/SAXIGP0/HPC0_DDR_HIGH]
+  exclude_bd_addr_seg -offset 0x000800000000 -range 0x000100000000 -target_address_space [get_bd_addr_spaces axi_dma_0/Data_MM2S] [get_bd_addr_segs zynq_ultra_ps_e_0/SAXIGP0/HPC0_DDR_HIGH]
   exclude_bd_addr_seg -offset 0xFF000000 -range 0x01000000 -target_address_space [get_bd_addr_spaces axi_dma_0/Data_MM2S] [get_bd_addr_segs zynq_ultra_ps_e_0/SAXIGP0/HPC0_LPS_OCM]
-  exclude_bd_addr_seg -target_address_space [get_bd_addr_spaces axi_dma_0/Data_S2MM] [get_bd_addr_segs zynq_ultra_ps_e_0/SAXIGP0/HPC0_DDR_HIGH]
+  exclude_bd_addr_seg -offset 0x000800000000 -range 0x000100000000 -target_address_space [get_bd_addr_spaces axi_dma_0/Data_S2MM] [get_bd_addr_segs zynq_ultra_ps_e_0/SAXIGP0/HPC0_DDR_HIGH]
   exclude_bd_addr_seg -offset 0xFF000000 -range 0x01000000 -target_address_space [get_bd_addr_spaces axi_dma_0/Data_S2MM] [get_bd_addr_segs zynq_ultra_ps_e_0/SAXIGP0/HPC0_LPS_OCM]
 
 
@@ -1323,6 +1344,7 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
   set_property PFM.IRQ {In1 {is_range "true"}} [get_bd_cells /customIntr_0]
 
 
+  validate_bd_design
   save_bd_design
 }
 # End of create_root_design()
@@ -1333,6 +1355,3 @@ Port;FD4A0000;FD4AFFFF;1|FPD;DPDMA;FD4C0000;FD4CFFFF;1|FPD;DDR_XMPU5_CFG;FD05000
 ##################################################################
 
 create_root_design ""
-
-
-common::send_gid_msg -ssname BD::TCL -id 2053 -severity "WARNING" "This Tcl script was generated from a block design that has not been validated. It is possible that design <$design_name> may result in errors during validation."

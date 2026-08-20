@@ -1,6 +1,7 @@
 import os
 import subprocess
 import sys
+import warnings
 from shutil import copy2
 
 from hls4ml.backends import VitisBackend, VivadoBackend
@@ -24,7 +25,18 @@ class VitisUnifiedBackend(VitisBackend):
         fifo_opt=False,
         bitfile=False,
         log_to_stdout=True,
+        vitis_fifo_sizing=False,
     ):
+        if fifo_opt and not cosim:
+            warnings.warn('fifo_opt requires cosim to be enabled; cosim will be run automatically.', stacklevel=2)
+            cosim = True
+
+        if vitis_fifo_sizing and not cosim:
+            warnings.warn(
+                'vitis_fifo_sizing requires cosim to be enabled; cosim will be run automatically.', stacklevel=2
+            )
+            cosim = True
+
         # it builds and return vivado reports
         if 'linux' in sys.platform:
             found = os.system('command -v v++ > /dev/null')
@@ -56,16 +68,16 @@ class VitisUnifiedBackend(VitisBackend):
 
         commands = []
         if synth:
-            self.prepare_sim_config_file(model, True)
+            self.prepare_sim_config_file(model, True, False)
             commands.append(('csynth', csynth_cmd, vitis_hls_dir))
             commands.append(('package', package_cmd, vitis_hls_dir))
 
         if csim:
-            self.prepare_sim_config_file(model, True)
+            self.prepare_sim_config_file(model, True, False)
             commands.append(('csim', csim_cmd, vitis_hls_dir))
 
         if cosim or fifo_opt:
-            self.prepare_sim_config_file(model, False)
+            self.prepare_sim_config_file(model, False, vitis_fifo_sizing)
             commands.append(('cosim', cosim_cmd, vitis_hls_dir))
 
         if bitfile:
@@ -90,11 +102,20 @@ class VitisUnifiedBackend(VitisBackend):
                     stdout_target.close()
                     stderr_target.close()
 
-    def prepare_sim_config_file(self, model, is_csim):
+    def prepare_sim_config_file(self, model, is_csim, enable_fifo_sizing=False):
+        if is_csim and enable_fifo_sizing:
+            raise ValueError('enable_fifo_sizing requires cosim; cannot use fifo sizing with csim config.')
+
         suffix = 'csim' if is_csim else 'cosim'
         src = f'{model.config.get_output_dir()}/hls_kernel_config_{suffix}.cfg'
         des = f'{model.config.get_output_dir()}/hls_kernel_config.cfg'
         copy2(src, des)
+
+        with open(des) as f:
+            content = f.read()
+        with open(des, 'w') as f:
+            f.write(content.replace('{ENABLE_FIFO_SIZING}', 'true' if enable_fifo_sizing else 'false'))
+
         return des
 
     def create_initial_config(
